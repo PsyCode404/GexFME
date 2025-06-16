@@ -1,0 +1,12 @@
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-RESTx
+Flask-Swagger-UI
+psycopg2-binary
+pycryptodome
+python-dotenv
+openpyxl
+ezdxf
+flask-cors
+shapely

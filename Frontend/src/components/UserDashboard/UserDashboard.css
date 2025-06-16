@@ -1,0 +1,54 @@
+/* Conteneur principal */
+.user-dashboard {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Contenu principal sous le header */
+.dashboard-body {
+    display: flex;
+    flex-grow: 1;
+    margin-top: 60px; /* Hauteur du header */
+}
+
+/* Contenu principal (hors sidebar) */
+.dashboard-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    transition: margin-left 0.3s ease-in-out;
+    margin-left: 70px; /* Largeur de la sidebar réduite */
+}
+
+/* Quand la sidebar est ouverte, décaler le contenu */
+.dashboard-content.shifted {
+    margin-left: 260px; /* Largeur de la sidebar étendue */
+}
+
+/* Conteneur du contenu */
+.content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    padding: 2rem;
+}
+
+/* Style du Card */
+.dashboard-card {
+    width: 100%;
+    max-width: 800px; /* Largeur max du Card */
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+/* Adaptation du Card lorsque la sidebar est ouverte */
+.dashboard-content.shifted .dashboard-card {
+    margin-left: 20px; /* Petit décalage pour meilleure visibilité */
+}
