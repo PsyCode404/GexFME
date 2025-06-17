@@ -15,8 +15,8 @@ const UserHeader = () => {
   return (
     <header className="header">
       <div className="header-left">
-        <a href="/user-dashboard"><img src={logo} className="header-logo" alt="Logo" /></a>
-        <span className="brand-name">GexFME</span>
+        <img src={logo} className="header-logo" alt="Logo" />
+        <span className="brand-name">TA-SDP Calculator</span>
       </div>
       <div className="header-right">
         <a className="header-link home-icon" onClick={() => navigate('/user-dashboard')}>

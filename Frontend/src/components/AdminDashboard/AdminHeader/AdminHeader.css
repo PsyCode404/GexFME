@@ -3,15 +3,15 @@
     justify-content: space-between;
     align-items: center;
     padding: 0 25px;
-    background-color: #ffffff;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    background-color: #1a1f36;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     z-index: 1000;
     height: 60px;
-    border-bottom: 1px solid rgba(0, 82, 204, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .header-left, .header-right {
@@ -21,14 +21,14 @@
 }
 
 .header-logo {
-    height: 35px;
-    width: auto;
+    height: 550px;
+    width: 50px;
     margin-right: 12px;
     object-fit: contain;
 }
 
 .logo-container .pi {
-    font-size: 20px;
+    font-size: 50px;
     color: #0052cc;
 }
 
@@ -43,7 +43,7 @@
 .brand-name {
     font-size: 18px;
     font-weight: 600;
-    color: #2c3e50;
+    color: #ffffff;
     letter-spacing: 0.5px;
 }
 
@@ -51,20 +51,46 @@
     display: flex;
     align-items: center;
     text-decoration: none;
-    color: #5a6a85;
+    color: #f0f4f8;
     margin-left: 20px;
     padding: 8px 12px;
     border-radius: 6px;
     transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.header-link i {
+    font-size: 18px;
+    color: #4cc9f0;
+    margin-right: 8px;
+}
+
+.header-link .link-text {
+    color: #f0f4f8;
+    font-weight: 500;
 }
 
 .header-link:hover {
-    background-color: rgba(0, 82, 204, 0.06);
-    color: #0052cc;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #4cc9f0;
+    box-shadow: 0 2px 4px rgba(76, 201, 240, 0.3);
+}
+
+.header-link:hover .link-text {
+    color: #4cc9f0;
 }
 
 .home-icon {
     cursor: pointer;
+}
+
+.home-icon .pi-home {
+    color: #2c3e50;
+    font-size: 1.2rem;
+}
+
+.home-icon:hover .pi-home {
+    color: #0052cc;
 }
 
 .support-icon-container {
@@ -88,13 +114,14 @@
 .header-link.support-link.static {
     background-color: transparent;
     transform: none;
-    cursor: default;
+    cursor: pointer;
+    color: #2c3e50;
 }
 
 .header-link.support-link.static:hover {
-    background-color: transparent;
-    transform: none;
-    box-shadow: none;
+    background-color: rgba(0, 82, 204, 0.05);
+    color: #0052cc;
+    box-shadow: 0 2px 4px rgba(0, 82, 204, 0.1);
 }
 
 /* Orange chat icon - always orange */
@@ -121,7 +148,8 @@
 .link-text {
     margin-left: 6px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
+    color: #2c3e50;
 }
 
 /* Notifications styling */
@@ -129,11 +157,29 @@
     position: relative;
 }
 
+.notifications i {
+    color: #4cc9f0;
+    font-size: 18px;
+}
+
+.notifications:hover .pi-bell {
+    color: #0052cc;
+}
+
 .notification-badge {
     position: absolute;
     top: -5px;
     right: -5px;
-    transform: scale(0.8);
+    font-size: 10px;
+    background-color: #ff6b6b;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
 }
 
 /* User profile styling */
@@ -145,26 +191,28 @@
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .user-profile:hover {
-    background-color: rgba(0, 82, 204, 0.06);
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .profile-avatar {
     background-color: #0052cc;
     color: #ffffff;
+    box-shadow: 0 2px 5px rgba(0, 82, 204, 0.2);
 }
 
 .profile-text {
     margin-left: 8px;
     font-size: 14px;
-    font-weight: 500;
-    color: #5a6a85;
+    font-weight: 600;
+    color: #2c3e50;
 }
 
 .user-profile:hover .profile-text {
-    color: #0052cc;
+    color: #4cc9f0;
 }
 
 /* Responsive adjustments */

@@ -15,8 +15,8 @@ const AdminHeader = () => {
   return (
     <header className="header">
       <div className="header-left">
-        <a href="/admin-dashboard"><img src={logo} className="header-logo" alt="Logo" /></a>
-        <span className="brand-name">GexFME</span>
+        <img src={logo} className="header-logo" alt="Logo" />
+        <span className="brand-name">TA-SDP Tool</span>
       </div>
       <div className="header-right">
         <a className="header-link home-icon" onClick={() => navigate('/admin-dashboard')}>

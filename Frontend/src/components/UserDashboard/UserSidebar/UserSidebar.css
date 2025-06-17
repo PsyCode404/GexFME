@@ -1,7 +1,7 @@
 /* Définition des variables CSS */
 :root {
-  --sidebar-bg: #000000;
-  --sidebar-hover: rgba(0, 0, 0, 0.8);
+  --sidebar-bg: #1a1f36;
+  --sidebar-hover: rgba(26, 31, 54, 0.8);
   --text-color: white;
   --icon-color: #ffffff;
   --active-color: #e67e22;

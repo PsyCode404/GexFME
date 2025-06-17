@@ -107,12 +107,9 @@ const SignUp = () => {
         onClose={() => setNotification({ message: '', type: '' })}
       />
 
-      <header className="header header-modern">
+      <header className="header">
         <div className="header-left">
-          <div className="logo-container">
-            <i className="uil uil-analytics"></i>
-            <i className="uil uil-chart-growth logo-overlay"></i>
-          </div>
+          <img src={logo} className="header-logo" alt="Logo" />
           <span className="brand-name">Gexpertise</span>
         </div>
         <div className="header-right">
