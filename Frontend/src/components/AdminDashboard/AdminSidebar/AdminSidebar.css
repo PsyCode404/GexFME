@@ -1,0 +1,259 @@
+/* Définition des variables CSS */
+:root {
+  --sidebar-bg: #1a1f36;
+  --sidebar-hover: rgba(26, 31, 54, 0.8);
+  --text-color: white;
+  --icon-color: #ffffff;
+  --active-color: #e67e22;
+  --logout-color: #E53E3E;
+  --logout-hover: #C53030;
+}
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  height: calc(100vh - 60px);
+  background: var(--sidebar-bg);
+  color: var(--text-color);
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  z-index: 1000;
+}
+
+/* Sidebar réduite */
+.sidebar.collapsed {
+  width: 90px !important;
+  min-width: 12px !important;
+}
+
+/* Sidebar étendue */
+.sidebar.expanded {
+  width: 260px;
+}
+
+/* Header avec logo et titre GEXPERTISE */
+.sidebar-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+  width: 100%;
+}
+
+/* Title link styles */
+.sidebar-title-link {
+  text-decoration: none;
+  color: var(--text-color);
+  display: block;
+  width: 100%;
+  transition: color 0.3s ease;
+  text-align: center;
+}
+
+.sidebar-title-link:hover {
+  color: var(--active-color);
+}
+
+/* Collapsed title */
+.sidebar-title.collapsed {
+  font-size: 24px;
+  text-align: center;
+  margin-top: 10px;
+}
+
+/* Titre "GEXPERTISE" */
+.sidebar-title {
+  color: var(--text-color);
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin: 0 auto;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+}
+
+/* Lettres individuelles */
+.letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(20px) rotateX(-90deg);
+  animation: letterAppear 0.5s ease-out forwards;
+}
+
+/* Nouvelle animation */
+@keyframes letterAppear {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) rotateX(-90deg);
+  }
+  60% {
+    opacity: 0.7;
+    transform: translateY(-5px) rotateX(20deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotateX(0deg);
+  }
+}
+
+/* Cacher le titre dans la sidebar réduite */
+.sidebar.collapsed .sidebar-title {
+  display: none;
+}
+
+/* Bouton de toggle */
+.toggle-button {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.6rem;
+  cursor: pointer;
+  align-self: center;
+  margin: 10px auto;
+  transition: transform 0.3s ease;
+  padding: 0.5rem;
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.toggle-button:hover {
+  color: var(--active-color);
+}
+
+/* Menu */
+.menu-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Élément de menu */
+.menu-item {
+  padding: 14px 12px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border-radius: 8px;
+  transition: all 0.3s ease-in-out;
+  margin-bottom: 5px;
+}
+
+/* Icône */
+.menu-icon {
+  font-size: 22px;
+  color: var(--icon-color);
+  transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+
+/* Animation des icônes au survol */
+.menu-item:hover .menu-icon {
+  transform: translateX(5px);
+  color: var(--active-color);
+}
+
+/* Label du menu */
+.menu-label {
+  margin-left: 15px;
+  font-weight: 500;
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Élément actif */
+.menu-item.active {
+  background: var(--active-color);
+  color: white;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(230, 126, 34, 0.5);
+}
+
+/* Effet au survol */
+.menu-item:hover {
+  background: var(--sidebar-hover);
+  transform: translateX(8px);
+}
+
+/* Cacher le texte dans la sidebar réduite */
+.sidebar.collapsed .menu-label {
+  display: none;
+}
+
+/* Ajustement des icônes dans la sidebar réduite */
+.sidebar.collapsed .menu-icon {
+  margin-right: 0;
+}
+
+/* Centrer le logo dans l'état réduit */
+.sidebar.collapsed .sidebar-header {
+  align-items: center;
+}
+
+/* Logo plus grand dans l'état réduit */
+.sidebar.collapsed .sidebar-logo {
+  width: 110px;
+  height: 110px;
+  margin-bottom: 0;
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+  transition: transform 0.3s ease-in-out, width 0.3s ease-in-out, height 0.3s ease-in-out;
+}
+
+/* Conteneur du bouton de déconnexion en bas de la sidebar */
+.logout-sidebar-container {
+  margin-top: auto;
+  width: 100%;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Bouton de déconnexion */
+.logout-sidebar-button {
+  display: flex;
+  align-items: center;
+  padding: 14px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.3s ease-in-out;
+  background-color: transparent;
+}
+
+.logout-sidebar-button:hover {
+  background-color: var(--logout-hover);
+  transform: translateX(8px);
+}
+
+/* Icône de déconnexion */
+.logout-sidebar-icon {
+  font-size: 22px;
+  color: var(--logout-color);
+  transition: transform 0.3s ease-in-out;
+}
+
+.logout-sidebar-button:hover .logout-sidebar-icon {
+  transform: translateX(5px);
+}
+
+/* Texte de déconnexion */
+.logout-sidebar-text {
+  margin-left: 15px;
+  font-weight: 500;
+  color: var(--logout-color);
+}
