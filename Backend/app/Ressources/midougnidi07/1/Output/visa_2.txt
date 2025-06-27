@@ -1,8 +1,8 @@
 ================================================================================
-RAPPORT DÉTAILLÉ DE CALCUL DE SURFACE - 7852
+RAPPORT DÉTAILLÉ DE CALCUL DE SURFACE - 2
 ================================================================================
-Date de génération: 24/06/2025 09:32:14
-Étage/Niveau: 7852
+Date de génération: 25/06/2025 10:49:22
+Étage/Niveau: 2
 
 RÉSUMÉ DES SURFACES:
 --------------------------------------------------
@@ -59,6 +59,6 @@ RECOMMANDATIONS TECHNIQUES:
 ================================================================================
 INFORMATIONS LÉGALES:
 --------------------------------------------------
-Ce rapport a été généré automatiquement le 24/06/2025 à 09:32:14
+Ce rapport a été généré automatiquement le 25/06/2025 à 10:49:22
 Les calculs sont effectués sur la base des éléments fournis dans les fichiers DXF.
 Ces résultats doivent être vérifiés par un professionnel qualifié.

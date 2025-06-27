@@ -1,8 +1,8 @@
 ================================================================================
-RAPPORT DÉTAILLÉ DE CALCUL DE SURFACE - 88
+RAPPORT DÉTAILLÉ DE CALCUL DE SURFACE - 3
 ================================================================================
-Date de génération: 24/06/2025 14:18:12
-Étage/Niveau: 88
+Date de génération: 25/06/2025 14:15:34
+Étage/Niveau: 3
 
 RÉSUMÉ DES SURFACES:
 --------------------------------------------------
@@ -59,6 +59,6 @@ RECOMMANDATIONS TECHNIQUES:
 ================================================================================
 INFORMATIONS LÉGALES:
 --------------------------------------------------
-Ce rapport a été généré automatiquement le 24/06/2025 à 14:18:12
+Ce rapport a été généré automatiquement le 25/06/2025 à 14:15:34
 Les calculs sont effectués sur la base des éléments fournis dans les fichiers DXF.
 Ces résultats doivent être vérifiés par un professionnel qualifié.
