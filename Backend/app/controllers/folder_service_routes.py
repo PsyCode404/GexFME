@@ -4,6 +4,13 @@ import os
 
 # Add the parent directory to sys.path to allow importing folder_service
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+# Force reload the module to ensure we get the latest version
+import importlib
+import folder_service
+importlib.reload(folder_service)
+
+# Import the functions we need
 from folder_service import (
     create_folder,
     check_folder,

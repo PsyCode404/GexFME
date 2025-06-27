@@ -1,3 +1,4 @@
+# Updated: 2025-06-27 11:40:00
 import os
 import logging
 import json
@@ -869,7 +870,7 @@ def generate_excel_file():
             ws['I1'] = "Surface projet"
             ws['J1'] = "Surface RDV"
             
-            # Ajout de l'étage
+            # Ajout de l'étage - seulement dans la première ligne
             ws['A2'] = floor_name
             
             # Traitement très simplifié des destinations
@@ -1580,7 +1581,11 @@ def generate_excel_file():
                     surface_rdv = surface_projet * 0.85  # 85% pour les autres destinations
                 
                 # Ajouter une ligne dans la feuille SDP
-                ws_sdp[f'A{sdp_row}'] = floor_name
+                # Write floor name only in the first row
+                if sdp_row == 2:  # First row of data
+                    ws_sdp[f'A{sdp_row}'] = floor_name
+                else:
+                    ws_sdp[f'A{sdp_row}'] = None  # Empty cell for subsequent rows
                 ws_sdp[f'B{sdp_row}'] = formatted_destination
                 
                 # Remplir les colonnes avec les données calculées
@@ -1675,6 +1680,8 @@ def generate_excel_file():
                 cell.font = data_font
                 cell.alignment = data_alignment
                 cell.border = border
+            
+            # No cell merging, etage name only appears in the first row
             
             # Sauvegarder le fichier Excel
             wb.save(excel_path)
@@ -2031,15 +2038,15 @@ def create_excel_document(excel_path, surfaces, floor_name):
     cell.alignment = data_alignment
     cell.border = border
     
-    # Création de la feuille SDP
-    ws_sdp = wb.create_sheet(title="SDP")
+    # Création de la feuille SDP avec un nouveau titre pour tester
+    ws_sdp = wb.create_sheet(title="SDP_VERIFICATION")
     
     # Configuration des colonnes SDP
     for col in columns:
         ws_sdp.column_dimensions[col].width = 15
     
     # En-tête de la feuille SDP - avec les titres modifiés et les colonnes divisées
-    ws_sdp['A1'] = "Etages"
+    ws_sdp['A1'] = "Etages_TEST"
     ws_sdp['B1'] = "Destinations"
     ws_sdp['C1'] = "Surface existante avant travaux (A)"
     ws_sdp['D1'] = "Surface creee (B)"
@@ -2056,14 +2063,20 @@ def create_excel_document(excel_path, surfaces, floor_name):
         cell.alignment = header_alignment
         cell.border = border
         
-    # Ajouter le nom d'étage dans la feuille SDP
+    # Ajouter le nom d'étage dans la feuille SDP uniquement dans la première ligne
     ws_sdp['A2'] = floor_name
     
     # Appliquer le style à la cellule du nom d'étage
-    cell = ws_sdp['A2']
+    cell = ws_sdp[f'A2']
     cell.font = data_font
     cell.alignment = data_alignment
     cell.border = border
+    
+    # Préparer la colonne A pour éviter la répétition du nom d'étage
+    # Nous allons utiliser une formule pour laisser les cellules vides
+    from openpyxl.worksheet.datavalidation import DataValidation
+    dv = DataValidation(type="custom", formula1="TRUE", showErrorMessage=False)
+    ws_sdp.add_data_validation(dv)
     
     # Utiliser les données réelles des polylignes pour la colonne Destinations
     row = 2  # Commencer à la ligne 2
@@ -2649,7 +2662,13 @@ def create_excel_document(excel_path, surfaces, floor_name):
     
     # Ajouter les destinations uniques à la feuille SDP avec leurs surfaces
     row = 2  # Commencer à la ligne 2
+    
+    # Stocker la première ligne et la dernière ligne pour fusionner les cellules plus tard
+    first_row = row
+    
+    # Traiter chaque destination séparément
     for destination in sorted_destinations:
+            
         # Colonne B: Destination (formatée pour une meilleure lisibilité)
         formatted_destination = format_destination(destination)
         ws_sdp[f'B{row}'] = formatted_destination
@@ -2695,6 +2714,15 @@ def create_excel_document(excel_path, surfaces, floor_name):
             cell.comment.height = 50
         
         row += 1
+    
+    # Fusionner les cellules de la colonne A pour que le nom de l'étage n'apparaisse qu'une fois
+    if row > 3:  # S'il y a plus d'une destination
+        last_row = row - 1
+        ws_sdp.merge_cells(f'A{first_row}:A{last_row}')
+        
+        # Centrer le nom de l'étage verticalement dans la cellule fusionnée
+        cell = ws_sdp['A2']
+        cell.alignment = Alignment(horizontal='center', vertical='center')
         
     # Ajouter les destinations uniques à la feuille TA avec leurs surfaces
     ta_row = 2  # Commencer à la ligne 2
