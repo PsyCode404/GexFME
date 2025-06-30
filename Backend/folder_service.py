@@ -1285,10 +1285,10 @@ def generate_excel_file():
                 cell.border = border
                 ws_sdp.column_dimensions[col].width = 22  # Ajuster la largeur des colonnes
             
-            # Créer une nouvelle feuille nommée "Detailled TA"
-            ws_ta = wb.create_sheet(title="Detailled TA")
+            # Créer une nouvelle feuille nommée "TA Projet" (anciennement "TA Demoli Detailled")
+            ws_ta = wb.create_sheet(title="TA Projet")
             
-            # En-têtes pour la feuille Detailled TA
+            # En-têtes pour la feuille TA Projet
             ws_ta['A1'] = "Étages"
             ws_ta['B1'] = "Destinations"
             ws_ta['C1'] = "TA avant déduction"
@@ -1331,32 +1331,100 @@ def generate_excel_file():
                 patterns = ['GEX_EDS_SDP_2', 'GEX_EDS_SDP_3', 'GEX_EDS_SDP_4', 'GEX_EDS_SDP_5', 'GEX_EDS_SDP_7']
                 return any(pattern in layer for pattern in patterns)
             
-            # Fonction pour vérifier si une polyligne est contenue dans une autre
-            def is_contained(polyline1, polyline2):
+            # Fonction pour calculer l'intersection entre deux polylignes et retourner la surface d'intersection
+            def calculate_intersection_area(polyline1, polyline2):
                 try:
+                    from shapely.geometry import Polygon, MultiPolygon, mapping
+                    from shapely.ops import unary_union
+                    import numpy as np
+                    
+                    # Extraire les informations des polylignes pour le débogage
+                    layer1 = polyline1.get('layer', 'inconnu')
+                    layer2 = polyline2.get('layer', 'inconnu')
+                    logger.info(f"Calcul d'intersection entre: {layer1} et {layer2}")
+                    
                     vertices1 = polyline1.get('vertices', [])
                     vertices2 = polyline2.get('vertices', [])
                     
-                    if not vertices1 or not vertices2:
-                        return False
+                    if len(vertices1) < 3 or len(vertices2) < 3:
+                        logger.warning(f"Pas assez de sommets pour former un polygone: {len(vertices1)} et {len(vertices2)}")
+                        return 0.0
+                    
+                    # Journaliser les sommets pour débogage
+                    logger.info(f"Polygone 1 ({layer1}): {len(vertices1)} sommets")
+                    logger.info(f"Polygone 2 ({layer2}): {len(vertices2)} sommets")
+                    
+                    # Convertir les sommets en points pour Shapely avec précision
+                    poly1_pts = [(float(v['x']), float(v['y'])) for v in vertices1]
+                    poly2_pts = [(float(v['x']), float(v['y'])) for v in vertices2]
+                    
+                    # S'assurer que les polygones sont fermés (premier et dernier point identiques)
+                    if poly1_pts[0] != poly1_pts[-1]:
+                        poly1_pts.append(poly1_pts[0])
+                    if poly2_pts[0] != poly2_pts[-1]:
+                        poly2_pts.append(poly2_pts[0])
+                    
+                    # Créer les polygones Shapely
+                    try:
+                        # Créer les polygones avec des coordonnées précises
+                        poly1 = Polygon(poly1_pts)
+                        poly2 = Polygon(poly2_pts)
                         
-                    # Trouver les limites de la boîte englobante pour polyline2
-                    min_x2 = min(v['x'] for v in vertices2)
-                    max_x2 = max(v['x'] for v in vertices2)
-                    min_y2 = min(v['y'] for v in vertices2)
-                    max_y2 = max(v['y'] for v in vertices2)
-                    
-                    # Vérifier si tous les points de polyline1 sont à l'intérieur de la boîte englobante de polyline2
-                    points_inside = 0
-                    for v in vertices1:
-                        if min_x2 <= v['x'] <= max_x2 and min_y2 <= v['y'] <= max_y2:
-                            points_inside += 1
-                    
-                    # Si au moins la moitié des points sont à l'intérieur, considérer comme contenu
-                    return points_inside >= len(vertices1) / 2
+                        # Journaliser les aires des polygones
+                        logger.info(f"Aire du polygone 1 ({layer1}): {poly1.area}")
+                        logger.info(f"Aire du polygone 2 ({layer2}): {poly2.area}")
+                        
+                        # Vérifier si les polygones sont valides
+                        if not poly1.is_valid:
+                            logger.warning(f"Polygone 1 ({layer1}) invalide, tentative de réparation")
+                            poly1 = poly1.buffer(0)  # Tenter de réparer le polygone
+                        if not poly2.is_valid:
+                            logger.warning(f"Polygone 2 ({layer2}) invalide, tentative de réparation")
+                            poly2 = poly2.buffer(0)  # Tenter de réparer le polygone
+                        
+                        if not poly1.is_valid:
+                            logger.warning(f"Polygone 1 ({layer1}) toujours invalide après réparation")
+                            return 0.0
+                        if not poly2.is_valid:
+                            logger.warning(f"Polygone 2 ({layer2}) toujours invalide après réparation")
+                            return 0.0
+                        
+                        # Ajouter une petite tolérance pour les intersections presque tangentes
+                        poly1_buffered = poly1.buffer(0.001)
+                        
+                        # Calculer l'intersection avec la tolérance
+                        if poly1_buffered.intersects(poly2):
+                            # Essayer d'abord avec la tolérance
+                            intersection = poly1_buffered.intersection(poly2)
+                            intersection_area = intersection.area
+                            
+                            # Si l'intersection est très petite, essayer sans tolérance
+                            if intersection_area < 0.01 and poly1.intersects(poly2):
+                                intersection = poly1.intersection(poly2)
+                                intersection_area = intersection.area
+                            
+                            logger.info(f"Intersection trouvée entre {layer1} et {layer2}! Aire: {intersection_area}")
+                            
+                            # Journaliser les coordonnées de l'intersection pour débogage
+                            try:
+                                intersection_coords = mapping(intersection)
+                                logger.info(f"Forme de l'intersection: {intersection.geom_type}")
+                            except Exception as e:
+                                logger.warning(f"Impossible d'extraire les coordonnées de l'intersection: {str(e)}")
+                            
+                            return intersection_area
+                        else:
+                            # Vérifier si les polygones sont très proches
+                            distance = poly1.distance(poly2)
+                            logger.info(f"Pas d'intersection entre {layer1} et {layer2}. Distance: {distance}")
+                            return 0.0
+                    except Exception as e:
+                        logger.warning(f"Erreur lors de la création des polygones: {str(e)}")
+                        return 0.0
+                        
                 except Exception as e:
-                    logger.warning(f"Erreur lors de la vérification de contenance: {str(e)}")
-                    return False
+                    logger.warning(f"Erreur lors du calcul d'intersection: {str(e)}")
+                    return 0.0
             
             # Filtrer les polylignes principales et spéciales
             main_projet_polylines = [p for p in projet_polylines if is_main_sdp_polyline(p)]
@@ -1402,22 +1470,139 @@ def generate_excel_file():
                         continue
                     
                     if 'GEX_EDS_SDP_2' in special_layer:  # Vides/TREMIE
-                        # Vérifier si cette polyligne spéciale est contenue dans une polyligne de cette destination
-                        for main_polyline in main_projet_polylines:
-                            if get_destination_from_layer(main_polyline.get('layer', '')) == destination and is_contained(polyline, main_polyline):
-                                # Calculer la surface de cette polyligne spéciale
-                                area = 0.0
-                                vertices = polyline.get('vertices', [])
-                                if len(vertices) >= 3:
-                                    # Calculer la surface en utilisant la formule de Shoelace
-                                    n = len(vertices)
-                                    for i in range(n):
-                                        j = (i + 1) % n
-                                        area += vertices[i]['x'] * vertices[j]['y']
-                                        area -= vertices[j]['x'] * vertices[i]['y']
-                                    area = abs(area) / 2.0
-                                vides += area
-                                break
+                        # Extraire les informations du vide pour le débogage
+                        void_id = polyline.get('id', 'inconnu')
+                        logger.info(f"Traitement du vide {void_id} avec calque {special_layer}")
+                        
+                        # Calculer d'abord la surface totale du vide
+                        void_area = 0.0
+                        vertices = polyline.get('vertices', [])
+                        
+                        if len(vertices) < 3:
+                            logger.warning(f"Pas assez de sommets pour le vide {void_id}: {len(vertices)}")
+                            continue
+                            
+                        from shapely.geometry import Polygon, mapping
+                        try:
+                            # Créer un polygone Shapely pour le vide
+                            void_pts = [(float(v['x']), float(v['y'])) for v in vertices]
+                            
+                            # S'assurer que le polygone est fermé
+                            if void_pts[0] != void_pts[-1]:
+                                void_pts.append(void_pts[0])
+                            
+                            # Journaliser les points du vide pour débogage
+                            logger.info(f"Vide {void_id}: {len(void_pts)} points")
+                            
+                            void_polygon = Polygon(void_pts)
+                            if not void_polygon.is_valid:
+                                logger.warning(f"Polygone de vide {void_id} invalide, tentative de réparation")
+                                void_polygon = void_polygon.buffer(0)  # Réparer le polygone si nécessaire
+                            
+                            if void_polygon.is_valid:
+                                void_area = void_polygon.area
+                                logger.info(f"Vide {void_id} valide trouvé avec surface: {void_area}")
+                                
+                                # Journaliser la forme du vide
+                                try:
+                                    void_coords = mapping(void_polygon)
+                                    logger.info(f"Forme du vide {void_id}: {void_polygon.geom_type}")
+                                except Exception as e:
+                                    logger.warning(f"Impossible d'extraire les coordonnées du vide {void_id}: {str(e)}")
+                            else:
+                                logger.warning(f"Polygone de vide {void_id} invalide après tentative de réparation")
+                                continue
+                        except Exception as e:
+                            logger.warning(f"Erreur lors de la création du polygone vide {void_id}: {str(e)}")
+                            continue
+                        
+                        # Calculer l'intersection avec les polylignes de cette destination
+                        intersection_found = False
+                        destination_polylines = [p for p in main_projet_polylines if get_destination_from_layer(p.get('layer', '')) == destination]
+                        
+                        logger.info(f"Vérification des intersections pour vide {void_id} avec {destination} ({len(destination_polylines)} polylignes)")
+                        
+                        # Essayer d'abord avec un buffer légèrement plus grand pour capturer les intersections proches
+                        void_polygon_buffered = void_polygon.buffer(0.05)  # Augmenter le buffer à 0.05 pour mieux capturer les intersections
+                        
+                        for main_polyline in destination_polylines:
+                            main_id = main_polyline.get('id', 'inconnu')
+                            main_layer = main_polyline.get('layer', 'inconnu')
+                            logger.info(f"Tentative d'intersection entre vide {void_id} et polyligne {main_id} (calque {main_layer})")
+                            
+                            # Calculer l'aire d'intersection avec méthode améliorée
+                            intersection_area = calculate_intersection_area(polyline, main_polyline)
+                            
+                            if intersection_area > 0:
+                                vides += intersection_area
+                                intersection_found = True
+                                logger.info(f"Intersection trouvée entre vide {void_id} et {destination} (polyligne {main_id}): {intersection_area}")
+                            else:
+                                # Essayer avec le buffer si l'intersection directe échoue
+                                try:
+                                    main_vertices = main_polyline.get('vertices', [])
+                                    if len(main_vertices) >= 3:
+                                        main_pts = [(float(v['x']), float(v['y'])) for v in main_vertices]
+                                        if main_pts[0] != main_pts[-1]:
+                                            main_pts.append(main_pts[0])
+                                            
+                                        main_polygon = Polygon(main_pts)
+                                        if main_polygon.is_valid:
+                                            # Vérifier l'intersection avec le buffer
+                                            if void_polygon_buffered.intersects(main_polygon):
+                                                buffer_intersection = void_polygon_buffered.intersection(main_polygon)
+                                                buffer_area = buffer_intersection.area
+                                                logger.info(f"Intersection avec buffer trouvée: {buffer_area}")
+                                                
+                                                # Utiliser l'aire du vide originale si l'intersection est significative
+                                                if buffer_area > 0.001:  # Seuil abaissé pour capturer plus d'intersections
+                                                    # Si l'intersection directe est nulle, utiliser l'aire du vide
+                                                    # dans la zone d'intersection du buffer
+                                                    intersection_ratio = buffer_area / void_polygon_buffered.area
+                                                    estimated_area = void_area * intersection_ratio
+                                                    
+                                                    # Vérifier si l'estimation est raisonnable
+                                                    if estimated_area > 0.001 and estimated_area <= void_area:
+                                                        vides += estimated_area
+                                                        intersection_found = True
+                                                        logger.info(f"Intersection estimée entre vide {void_id} et {destination} (polyligne {main_id}): {estimated_area}")
+                                                    else:
+                                                        # Essayer une dernière fois avec un calcul direct
+                                                        actual_intersection = void_polygon.intersection(main_polygon)
+                                                        actual_area = actual_intersection.area
+                                                        if actual_area > 0:
+                                                            vides += actual_area
+                                                            intersection_found = True
+                                                            logger.info(f"Intersection directe après buffer entre vide {void_id} et {destination} (polyligne {main_id}): {actual_area}")
+                                                        elif buffer_area > 0.1:  # Si l'intersection avec buffer est significative
+                                                            # Utiliser une valeur minimale basée sur le buffer
+                                                            min_area = min(void_area, buffer_area * 0.5)
+                                                            vides += min_area
+                                                            intersection_found = True
+                                                            logger.info(f"Intersection minimale entre vide {void_id} et {destination} (polyligne {main_id}): {min_area}")
+                                                            logger.info(f"  - Aire du vide: {void_area}")
+                                                            logger.info(f"  - Aire de l'intersection avec buffer: {buffer_area}")
+                                                            logger.info(f"  - Aire minimale utilisée: {min_area}")
+                                                            logger.info(f"  - Coordonnées du vide: {void_polygon.wkt}")
+                                                            logger.info(f"  - Coordonnées de la destination: {main_polygon.wkt}")
+                                                            logger.info(f"  - Coordonnées de l'intersection: {buffer_intersection.wkt}")
+                                                            logger.info(f"  - Distance entre polygones: {void_polygon.distance(main_polygon)}")
+                                                            logger.info(f"  - Centroide vide: {void_polygon.centroid.wkt}")
+                                                            logger.info(f"  - Centroide destination: {main_polygon.centroid.wkt}")
+                                                            logger.info(f"  - Distance entre centroides: {void_polygon.centroid.distance(main_polygon.centroid)}")
+                                                            
+                                                            # Journaliser la valeur finale des vides pour cette destination
+                                                            logger.info(f"VALEUR FINALE DES VIDES POUR {destination}: {vides}")
+                                                            
+                                                            # Forcer la mise à jour dans ta_data pour cette destination
+                                                            if destination in ta_data:
+                                                                ta_data[destination]['vides'] = vides
+                                except Exception as e:
+                                    logger.warning(f"Erreur lors de la vérification d'intersection avec buffer: {str(e)}")
+                        
+                        # Journaliser si aucune intersection n'a été trouvée pour ce vide avec cette destination
+                        if not intersection_found:
+                            logger.warning(f"Aucune intersection trouvée entre le vide {void_id} ({void_area}) et la destination {destination}")
                 
                 # Identifier les surfaces dont h < 1.80m (GEX_EDS_SDP_3 - H-180)
                 for polyline in special_projet_polylines:
@@ -1426,28 +1611,146 @@ def generate_excel_file():
                         continue
                     
                     if 'GEX_EDS_SDP_3' in special_layer:  # H-180
-                        # Vérifier si cette polyligne spéciale est contenue dans une polyligne de cette destination
-                        for main_polyline in main_projet_polylines:
-                            if get_destination_from_layer(main_polyline.get('layer', '')) == destination and is_contained(polyline, main_polyline):
-                                # Calculer la surface de cette polyligne spéciale
-                                area = 0.0
-                                vertices = polyline.get('vertices', [])
-                                if len(vertices) >= 3:
-                                    # Calculer la surface en utilisant la formule de Shoelace
-                                    n = len(vertices)
-                                    for i in range(n):
-                                        j = (i + 1) % n
-                                        area += vertices[i]['x'] * vertices[j]['y']
-                                        area -= vertices[j]['x'] * vertices[i]['y']
-                                    area = abs(area) / 2.0
-                                surfaces_h_moins_180 += area
-                                break
+                        # Extraire les informations de la zone h<1.80m pour le débogage
+                        h180_id = polyline.get('id', 'inconnu')
+                        logger.info(f"Traitement de la zone h<1.80m {h180_id} avec calque {special_layer}")
+                        
+                        # Calculer d'abord la surface totale de la zone h<1.80m
+                        h180_area = 0.0
+                        vertices = polyline.get('vertices', [])
+                        
+                        if len(vertices) < 3:
+                            logger.warning(f"Pas assez de sommets pour la zone h<1.80m {h180_id}: {len(vertices)}")
+                            continue
+                            
+                        from shapely.geometry import Polygon, mapping
+                        try:
+                            # Créer un polygone Shapely pour la zone h<1.80m
+                            h180_pts = [(float(v['x']), float(v['y'])) for v in vertices]
+                            
+                            # S'assurer que le polygone est fermé
+                            if h180_pts[0] != h180_pts[-1]:
+                                h180_pts.append(h180_pts[0])
+                            
+                            # Journaliser les points de la zone h<1.80m pour débogage
+                            logger.info(f"Zone h<1.80m {h180_id}: {len(h180_pts)} points")
+                            
+                            h180_polygon = Polygon(h180_pts)
+                            if not h180_polygon.is_valid:
+                                logger.warning(f"Polygone de zone h<1.80m {h180_id} invalide, tentative de réparation")
+                                h180_polygon = h180_polygon.buffer(0)  # Réparer le polygone si nécessaire
+                            
+                            if h180_polygon.is_valid:
+                                h180_area = h180_polygon.area
+                                logger.info(f"Zone h<1.80m {h180_id} valide trouvée avec surface: {h180_area}")
+                                
+                                # Journaliser la forme de la zone h<1.80m
+                                try:
+                                    h180_coords = mapping(h180_polygon)
+                                    logger.info(f"Forme de la zone h<1.80m {h180_id}: {h180_polygon.geom_type}")
+                                except Exception as e:
+                                    logger.warning(f"Impossible d'extraire les coordonnées de la zone h<1.80m {h180_id}: {str(e)}")
+                            else:
+                                logger.warning(f"Polygone de zone h<1.80m {h180_id} invalide après tentative de réparation")
+                                continue
+                        except Exception as e:
+                            logger.warning(f"Erreur lors de la création du polygone h<1.80m {h180_id}: {str(e)}")
+                            continue
+                        
+                        # Calculer l'intersection avec les polylignes de cette destination
+                        intersection_found = False
+                        destination_polylines = [p for p in main_projet_polylines if get_destination_from_layer(p.get('layer', '')) == destination]
+                        
+                        logger.info(f"Vérification des intersections pour zone h<1.80m {h180_id} avec {destination} ({len(destination_polylines)} polylignes)")
+                        
+                        # Essayer d'abord avec un buffer légèrement plus grand pour capturer les intersections proches
+                        h180_polygon_buffered = h180_polygon.buffer(0.05)  # Augmenter le buffer à 0.05 pour mieux capturer les intersections
+                        
+                        for main_polyline in destination_polylines:
+                            main_id = main_polyline.get('id', 'inconnu')
+                            main_layer = main_polyline.get('layer', 'inconnu')
+                            logger.info(f"Tentative d'intersection entre zone h<1.80m {h180_id} et polyligne {main_id} (calque {main_layer})")
+                            
+                            # Calculer l'aire d'intersection avec méthode améliorée
+                            intersection_area = calculate_intersection_area(polyline, main_polyline)
+                            
+                            if intersection_area > 0:
+                                surfaces_h_moins_180 += intersection_area
+                                intersection_found = True
+                                logger.info(f"Intersection trouvée entre zone h<1.80m {h180_id} et {destination} (polyligne {main_id}): {intersection_area}")
+                            else:
+                                # Essayer avec le buffer si l'intersection directe échoue
+                                try:
+                                    main_vertices = main_polyline.get('vertices', [])
+                                    if len(main_vertices) >= 3:
+                                        main_pts = [(float(v['x']), float(v['y'])) for v in main_vertices]
+                                        if main_pts[0] != main_pts[-1]:
+                                            main_pts.append(main_pts[0])
+                                            
+                                        main_polygon = Polygon(main_pts)
+                                        if main_polygon.is_valid:
+                                            # Vérifier l'intersection avec le buffer
+                                            if h180_polygon_buffered.intersects(main_polygon):
+                                                buffer_intersection = h180_polygon_buffered.intersection(main_polygon)
+                                                buffer_area = buffer_intersection.area
+                                                logger.info(f"Intersection avec buffer trouvée pour h<1.80m: {buffer_area}")
+                                                
+                                                # Utiliser l'aire de la zone h<1.80m originale si l'intersection est significative
+                                                if buffer_area > 0.001:  # Seuil abaissé pour capturer plus d'intersections
+                                                    # Si l'intersection directe est nulle, utiliser l'aire de la zone h<1.80m
+                                                    # dans la zone d'intersection du buffer
+                                                    intersection_ratio = buffer_area / h180_polygon_buffered.area
+                                                    estimated_area = h180_area * intersection_ratio
+                                                    
+                                                    # Vérifier si l'estimation est raisonnable
+                                                    if estimated_area > 0.001 and estimated_area <= h180_area:
+                                                        surfaces_h_moins_180 += estimated_area
+                                                        intersection_found = True
+                                                        logger.info(f"Intersection estimée entre zone h<1.80m {h180_id} et {destination} (polyligne {main_id}): {estimated_area}")
+                                                    else:
+                                                        # Essayer une dernière fois avec un calcul direct
+                                                        actual_intersection = h180_polygon.intersection(main_polygon)
+                                                        actual_area = actual_intersection.area
+                                                        if actual_area > 0:
+                                                            surfaces_h_moins_180 += actual_area
+                                                            intersection_found = True
+                                                            logger.info(f"Intersection directe après buffer entre zone h<1.80m {h180_id} et {destination} (polyligne {main_id}): {actual_area}")
+                                                        elif buffer_area > 0.1:  # Si l'intersection avec buffer est significative
+                                                            # Utiliser une valeur minimale basée sur le buffer
+                                                            min_area = min(h180_area, buffer_area * 0.5)
+                                                            surfaces_h_moins_180 += min_area
+                                                            intersection_found = True
+                                                            logger.info(f"Intersection minimale entre zone h<1.80m {h180_id} et {destination} (polyligne {main_id}): {min_area}")
+                                                            logger.info(f"  - Aire de la zone h<1.80m: {h180_area}")
+                                                            logger.info(f"  - Aire de l'intersection avec buffer: {buffer_area}")
+                                                            logger.info(f"  - Aire minimale utilisée: {min_area}")
+                                                            logger.info(f"  - Distance entre polygones: {h180_polygon.distance(main_polygon)}")
+                                                            
+                                                            # Journaliser la valeur finale des surfaces h<1.80m pour cette destination
+                                                            logger.info(f"VALEUR FINALE DES SURFACES H<1.80m POUR {destination}: {surfaces_h_moins_180}")
+                                                            
+                                                            # Forcer la mise à jour dans ta_data pour cette destination
+                                                            if destination in ta_data:
+                                                                ta_data[destination]['surfaces_h_moins_180'] = surfaces_h_moins_180
+                                except Exception as e:
+                                    logger.warning(f"Erreur lors de la vérification d'intersection avec buffer pour h<1.80m: {str(e)}")
+                        
+                        # Journaliser si aucune intersection n'a été trouvée pour cette zone h<1.80m avec cette destination
+                        if not intersection_found:
+                            logger.warning(f"Aucune intersection trouvée entre la zone h<1.80m {h180_id} ({h180_area}) et la destination {destination}")
                 
                 # Calculer le TOTAL T.A.
                 total_ta = planchers_avant_deductions - (vides + surfaces_h_moins_180)
                 
                 # S'assurer que le total n'est pas négatif
                 total_ta = max(0, total_ta)
+                
+                # Journaliser les valeurs calculées avant de les stocker
+                logger.info(f"DESTINATION {destination} - VALEURS FINALES:")
+                logger.info(f"  - Planchers avant déductions: {planchers_avant_deductions}")
+                logger.info(f"  - Vides: {vides}")
+                logger.info(f"  - Surfaces h<1.80m: {surfaces_h_moins_180}")
+                logger.info(f"  - Total TA: {total_ta}")
                 
                 # Stocker les données pour cette destination
                 ta_data[destination] = {
@@ -1483,7 +1786,10 @@ def generate_excel_file():
                 
                 # Colonne D: Vides
                 vides = destination_ta_data.get('vides', 0)
-                ws_ta[f'D{ta_row}'] = round(vides, 4) if vides > 0 else 0
+                logger.info(f"EXCEL - {formatted_destination} - Vides: {vides}")
+                excel_vides_value = round(vides, 4) if vides > 0 else 0
+                ws_ta[f'D{ta_row}'] = excel_vides_value
+                logger.info(f"EXCEL - Valeur écrite dans D{ta_row}: {excel_vides_value}")
                 cell = ws_ta[f'D{ta_row}']
                 cell.font = data_font
                 cell.alignment = data_alignment
@@ -1491,7 +1797,10 @@ def generate_excel_file():
                 
                 # Colonne E: Surfaces dont h < 1.80m
                 surfaces_h_moins_180 = destination_ta_data.get('surfaces_h_moins_180', 0)
-                ws_ta[f'E{ta_row}'] = round(surfaces_h_moins_180, 4) if surfaces_h_moins_180 > 0 else 0
+                logger.info(f"EXCEL - {formatted_destination} - Surfaces h<1.80m: {surfaces_h_moins_180}")
+                excel_h180_value = round(surfaces_h_moins_180, 4) if surfaces_h_moins_180 > 0 else 0
+                ws_ta[f'E{ta_row}'] = excel_h180_value
+                logger.info(f"EXCEL - Valeur écrite dans E{ta_row}: {excel_h180_value}")
                 cell = ws_ta[f'E{ta_row}']
                 cell.font = data_font
                 cell.alignment = data_alignment
@@ -1609,16 +1918,177 @@ def generate_excel_file():
                 
                 sdp_row += 1
             
+            # Créer une nouvelle feuille nommée "TA Existant" avec la même structure que "TA Projet"
+            ws_ta_existant = wb.create_sheet(title="TA Existant")
+            
+            # En-têtes pour la feuille TA Existant (même structure que TA Projet)
+            ws_ta_existant['A1'] = "Étages"
+            ws_ta_existant['B1'] = "Destinations"
+            ws_ta_existant['C1'] = "TA avant déduction"
+            ws_ta_existant['D1'] = "Vides"
+            ws_ta_existant['E1'] = "Surfaces dont h < 1.80m"
+            ws_ta_existant['F1'] = "TA après déduction"
+            
+            # Appliquer le style aux en-têtes
+            for col in ['A', 'B', 'C', 'D', 'E', 'F']:
+                cell = ws_ta_existant[f'{col}1']
+                cell.font = header_font
+                cell.alignment = header_alignment
+                cell.border = border
+                ws_ta_existant.column_dimensions[col].width = 15  # Ajuster la largeur des colonnes
+            
+            # Traiter les données pour la feuille "TA Existant" (basé sur existant.dxf)
+            # Nous utilisons les polylignes existantes qui sont dans le fichier existant.dxf
+            # Filtrer les polylignes principales et spéciales pour existant.dxf
+            main_existant_polylines = [p for p in existant_polylines if is_main_sdp_polyline(p)]
+            special_existant_polylines = [p for p in existant_polylines if is_special_polyline(p)]
+            
+            # Collecter toutes les destinations des polylignes principales
+            all_existant_destinations = set()
+            for polyline in main_existant_polylines:
+                destination = get_destination_from_layer(polyline.get('layer', ''))
+                if destination:
+                    all_existant_destinations.add(destination)
+            
+            # Dictionnaire pour stocker les données T.A. Existant par destination
+            ta_existant_data = {}
+            
+            # Calculer les données T.A. Existant pour chaque destination
+            for destination in all_existant_destinations:
+                # Initialiser les valeurs pour cette destination
+                planchers_avant_deductions = 0.0  # Planchers avant déductions
+                vides = 0.0                       # Vides (stairwells, elevator shafts, etc.)
+                surfaces_h_moins_180 = 0.0        # Surfaces dont h < 1.80m
+                
+                # Calculer Planchers avant déductions - utiliser les surfaces principales
+                for polyline in main_existant_polylines:
+                    if get_destination_from_layer(polyline.get('layer', '')) == destination:
+                        # Calculer la surface de cette polyligne
+                        area = calculate_polyline_area(polyline)
+                        planchers_avant_deductions += area
+                
+                # Identifier les vides (GEX_EDS_SDP_2 - TREMIE)
+                for polyline in special_existant_polylines:
+                    special_layer = polyline.get('layer', '')
+                    if not isinstance(special_layer, str):
+                        continue
+                    
+                    if 'GEX_EDS_SDP_2' in special_layer:  # Vides/TREMIE
+                        # Calculer l'intersection avec les polylignes de cette destination
+                        destination_polylines = [p for p in main_existant_polylines if get_destination_from_layer(p.get('layer', '')) == destination]
+                        
+                        for main_polyline in destination_polylines:
+                            # Calculer l'aire d'intersection avec méthode améliorée
+                            intersection_area = calculate_intersection_area(polyline, main_polyline)
+                            if intersection_area > 0:
+                                vides += intersection_area
+                
+                # Identifier les surfaces dont h < 1.80m (GEX_EDS_SDP_3 - H-180)
+                for polyline in special_existant_polylines:
+                    special_layer = polyline.get('layer', '')
+                    if not isinstance(special_layer, str):
+                        continue
+                    
+                    if 'GEX_EDS_SDP_3' in special_layer:  # H-180
+                        # Calculer l'intersection avec les polylignes de cette destination
+                        destination_polylines = [p for p in main_existant_polylines if get_destination_from_layer(p.get('layer', '')) == destination]
+                        
+                        for main_polyline in destination_polylines:
+                            # Calculer l'aire d'intersection avec méthode améliorée
+                            intersection_area = calculate_intersection_area(polyline, main_polyline)
+                            if intersection_area > 0:
+                                surfaces_h_moins_180 += intersection_area
+                
+                # Calculer le TOTAL T.A.
+                total_ta = planchers_avant_deductions - (vides + surfaces_h_moins_180)
+                
+                # S'assurer que le total n'est pas négatif
+                total_ta = max(0, total_ta)
+                
+                # Stocker les données pour cette destination
+                ta_existant_data[destination] = {
+                    'planchers_avant_deductions': planchers_avant_deductions,
+                    'vides': vides,
+                    'surfaces_h_moins_180': surfaces_h_moins_180,
+                    'total_ta': total_ta
+                }
+            
+            # Ajouter les données T.A. Existant à la feuille TA Existant
+            ta_existant_row = 2
+            ws_ta_existant[f'A{ta_existant_row}'] = floor_name
+            
+            # Appliquer le style à la cellule de l'étage
+            cell = ws_ta_existant[f'A{ta_existant_row}']
+            cell.font = data_font
+            cell.alignment = data_alignment
+            cell.border = border
+            
+            for destination in sorted(all_existant_destinations):
+                # Formater le nom de la destination pour une meilleure lisibilité
+                formatted_destination = special_cases.get(destination, destination.replace('_', ' ').lower().capitalize())
+                
+                # Colonne B: Destination
+                ws_ta_existant[f'B{ta_existant_row}'] = formatted_destination
+                cell = ws_ta_existant[f'B{ta_existant_row}']
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = border
+                
+                # Récupérer les données T.A. pour cette destination
+                destination_ta_data = ta_existant_data.get(destination, {})
+                
+                # Colonne C: TA avant déduction
+                planchers_avant_deductions = destination_ta_data.get('planchers_avant_deductions', 0)
+                ws_ta_existant[f'C{ta_existant_row}'] = round(planchers_avant_deductions, 4) if planchers_avant_deductions > 0 else 0
+                cell = ws_ta_existant[f'C{ta_existant_row}']
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = border
+                
+                # Colonne D: Vides
+                vides = destination_ta_data.get('vides', 0)
+                excel_vides_value = round(vides, 4) if vides > 0 else 0
+                ws_ta_existant[f'D{ta_existant_row}'] = excel_vides_value
+                cell = ws_ta_existant[f'D{ta_existant_row}']
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = border
+                
+                # Colonne E: Surfaces dont h < 1.80m
+                surfaces_h_moins_180 = destination_ta_data.get('surfaces_h_moins_180', 0)
+                excel_h180_value = round(surfaces_h_moins_180, 4) if surfaces_h_moins_180 > 0 else 0
+                ws_ta_existant[f'E{ta_existant_row}'] = excel_h180_value
+                cell = ws_ta_existant[f'E{ta_existant_row}']
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = border
+                
+                # Colonne F: TA après déduction
+                total_ta = destination_ta_data.get('total_ta', 0)
+                ws_ta_existant[f'F{ta_existant_row}'] = round(total_ta, 4) if total_ta > 0 else 0
+                cell = ws_ta_existant[f'F{ta_existant_row}']
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = border
+                
+                # Ajouter un commentaire expliquant le calcul
+                comment = Comment(f"TA après déduction = TA avant déduction - (Vides + Surfaces dont h < 1.80m)", "Calcul T.A.")
+                comment.width = 300
+                comment.height = 50
+                cell.comment = comment
+                
+                ta_existant_row += 1
+            
             # Créer une nouvelle feuille nommée "TA Summary"
             ws_ta_summary = wb.create_sheet(title="TA Summary")
             
             # En-têtes pour la feuille TA Summary avec les nouvelles colonnes demandées
             ws_ta_summary['A1'] = "Étages"
-            ws_ta_summary['B1'] = "TA existant"
-            ws_ta_summary['C1'] = "TA créé"
-            ws_ta_summary['D1'] = "TA démoli/reconstruit"
-            ws_ta_summary['E1'] = "TA supprimé"
-            ws_ta_summary['F1'] = "TA projet"
+            ws_ta_summary['B1'] = "TA Existant"
+            ws_ta_summary['C1'] = "TA Projet"
+            ws_ta_summary['D1'] = "TA créé"
+            ws_ta_summary['E1'] = "TA démoli/reconstruit"
+            ws_ta_summary['F1'] = "TA supprimé"
             
             # Appliquer le style aux en-têtes
             for col in ['A', 'B', 'C', 'D', 'E', 'F']:
@@ -1629,50 +2099,61 @@ def generate_excel_file():
                 ws_ta_summary.column_dimensions[col].width = 18  # Ajuster la largeur des colonnes
             
             # Calculer les totaux pour le résumé
+            # Calculer le total de TA Existant à partir de la feuille TA Existant
             ta_existant_total = 0
-            ta_cree_total = 0
-            ta_demoli_reconstruit_total = 0
-            ta_supprime_total = 0
-            ta_projet_total = 0
+            for destination in all_existant_destinations:
+                destination_ta_data = ta_existant_data.get(destination, {})
+                total_ta = destination_ta_data.get('total_ta', 0)
+                ta_existant_total += total_ta
             
-            # Calculer les totaux à partir des données de calculation_results
-            # en suivant la même logique que pour la feuille SDP
+            # Calculer le total de TA Projet à partir de la feuille TA Projet
+            ta_projet_total = 0
             for destination in all_destinations:
-                # TA existant - directement depuis Projet_demoli_feuille_TA.dxf
-                ta_existant = calculation_results['existant'].get(destination, 0)
-                ta_existant_total += ta_existant
-                
-                # TA projet - directement depuis Existant_exmple_demoli.dxf
-                ta_projet = calculation_results['projet'].get(destination, 0)
-                ta_projet_total += ta_projet
-                
-                # TA démoli/reconstruit - zones démolies qui sont reconstruites
+                destination_ta_data = ta_data.get(destination, {})
+                total_ta = destination_ta_data.get('total_ta', 0)
+                ta_projet_total += total_ta
+            
+            # Calculer les autres métriques de comparaison
+            # TA créé - nouvelles surfaces (différence positive entre projet et existant)
+            ta_cree_total = max(0, ta_projet_total - ta_existant_total)
+            
+            # TA démoli/reconstruit - zones démolies qui sont reconstruites
+            ta_demoli_reconstruit_total = 0
+            for destination in all_destinations:
                 ta_demoli_reconstruit = calculation_results['demolition'].get(destination, 0)
                 ta_demoli_reconstruit_total += ta_demoli_reconstruit
-                
-                # TA supprimé - zones existantes qui ne sont plus présentes dans le projet
-                # et qui ne sont pas reconstruites
-                ta_supprime = max(0, ta_existant - ta_projet - ta_demoli_reconstruit)
-                if ta_supprime < 0.01:  # Éviter les valeurs négligeables dues aux erreurs d'arrondi
-                    ta_supprime = 0
-                ta_supprime_total += ta_supprime
             
-            # TA créé - nouvelles surfaces (différence positive entre projet et existant)
-            ta_cree_total = max(0, ta_projet_total - ta_existant_total + ta_supprime_total)
+            # TA supprimé - zones existantes qui ne sont plus présentes dans le projet
+            # et qui ne sont pas reconstruites
+            ta_supprime_total = max(0, ta_existant_total - ta_projet_total + ta_demoli_reconstruit_total)
+            if ta_supprime_total < 0.01:  # Éviter les valeurs négligeables dues aux erreurs d'arrondi
+                ta_supprime_total = 0
+                
+            # Journaliser les totaux calculés pour débogage
+            logger.info(f"TA Existant total: {ta_existant_total}")
+            logger.info(f"TA Projet total: {ta_projet_total}")
+            logger.info(f"TA créé total: {ta_cree_total}")
+            logger.info(f"TA démoli/reconstruit total: {ta_demoli_reconstruit_total}")
+            logger.info(f"TA supprimé total: {ta_supprime_total}")
             
             # Ajouter les données à la feuille TA Summary
             ws_ta_summary['A2'] = floor_name
             ws_ta_summary['B2'] = round(ta_existant_total, 4) if ta_existant_total > 0 else 0
-            ws_ta_summary['C2'] = round(ta_cree_total, 4) if ta_cree_total > 0 else 0
-            ws_ta_summary['D2'] = round(ta_demoli_reconstruit_total, 4) if ta_demoli_reconstruit_total > 0 else 0
-            ws_ta_summary['E2'] = round(ta_supprime_total, 4) if ta_supprime_total > 0 else 0
-            ws_ta_summary['F2'] = round(ta_projet_total, 4) if ta_projet_total > 0 else 0
+            ws_ta_summary['C2'] = round(ta_projet_total, 4) if ta_projet_total > 0 else 0
+            ws_ta_summary['D2'] = round(ta_cree_total, 4) if ta_cree_total > 0 else 0
+            ws_ta_summary['E2'] = round(ta_demoli_reconstruit_total, 4) if ta_demoli_reconstruit_total > 0 else 0
+            ws_ta_summary['F2'] = round(ta_supprime_total, 4) if ta_supprime_total > 0 else 0
             
-            # Ajouter un commentaire expliquant le calcul de TA créé
-            comment = Comment(f"TA créé = TA projet - TA existant + TA supprimé", "Calcul TA créé")
-            comment.width = 300
-            comment.height = 50
-            ws_ta_summary['C2'].comment = comment
+            # Ajouter des commentaires expliquant les calculs
+            comment_cree = Comment(f"TA créé = TA Projet - TA Existant (si positif)", "Calcul TA créé")
+            comment_cree.width = 300
+            comment_cree.height = 50
+            ws_ta_summary['D2'].comment = comment_cree
+            
+            comment_supprime = Comment(f"TA supprimé = TA Existant - TA Projet + TA démoli/reconstruit (si positif)", "Calcul TA supprimé")
+            comment_supprime.width = 300
+            comment_supprime.height = 50
+            ws_ta_summary['F2'].comment = comment_supprime
             
             # Appliquer le style aux cellules
             for col in ['A', 'B', 'C', 'D', 'E', 'F']:

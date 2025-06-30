@@ -1,8 +1,8 @@
 ================================================================================
-RAPPORT DÉTAILLÉ DE CALCUL DE SURFACE - 2
+RAPPORT DÉTAILLÉ DE CALCUL DE SURFACE - test2
 ================================================================================
-Date de génération: 25/06/2025 10:49:22
-Étage/Niveau: 2
+Date de génération: 30/06/2025 11:34:38
+Étage/Niveau: test2
 
 RÉSUMÉ DES SURFACES:
 --------------------------------------------------
@@ -59,6 +59,6 @@ RECOMMANDATIONS TECHNIQUES:
 ================================================================================
 INFORMATIONS LÉGALES:
 --------------------------------------------------
-Ce rapport a été généré automatiquement le 25/06/2025 à 10:49:22
+Ce rapport a été généré automatiquement le 30/06/2025 à 11:34:38
 Les calculs sont effectués sur la base des éléments fournis dans les fichiers DXF.
 Ces résultats doivent être vérifiés par un professionnel qualifié.
