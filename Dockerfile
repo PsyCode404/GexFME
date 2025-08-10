@@ -23,6 +23,7 @@ FROM python:3.11-slim AS backend
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV FLASK_ENV=production
+ENV FLASK_APP=manage.py
 
 # Install system dependencies for Shapely/GEOS and other requirements
 RUN apt-get update && apt-get install -y \
@@ -61,5 +62,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 
-# Start the application with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "wsgi:app"]
+# Start script that runs migrations then starts the app
+CMD ["sh", "-c", "flask db upgrade && gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 120 wsgi:app"]
