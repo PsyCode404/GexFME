@@ -41,7 +41,7 @@ def create_app():
     # Initialisation des extensions
     db.init_app(app)
     jwt.init_app(app)
-    migrate = Migrate(app, db)
+    migrate = Migrate(app, db, directory='migrations')
     logger.info("Extensions (DB, JWT, Migrate) initialized")
 
     # Initialisation de l'API avec Swagger
