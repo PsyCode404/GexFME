@@ -78,6 +78,27 @@ def create_app():
     # api.add_namespace(user_folder_ns, path="/api/user-folder")
     logger.info("API namespaces registered")
 
+    # Serve React static files - handle nested static directory structure
+    @app.route('/static/<path:filename>')
+    def serve_static(filename):
+        """Serve static files from React build."""
+        static_dir = os.path.join(os.path.dirname(app.root_path), 'static')
+        
+        # React build puts assets in static/static/, so we need to handle this properly
+        # First try the nested static directory (where CSS/JS files are)
+        nested_static_path = os.path.join(static_dir, 'static', filename)
+        if os.path.exists(nested_static_path):
+            return send_from_directory(os.path.join(static_dir, 'static'), filename)
+        
+        # Fallback to direct static directory (for manifest.json, favicon.ico, etc.)
+        direct_static_path = os.path.join(static_dir, filename)
+        if os.path.exists(direct_static_path):
+            return send_from_directory(static_dir, filename)
+        
+        # If file not found, return 404
+        logger.warning(f"Static file not found: {filename}")
+        return {'error': 'Static file not found'}, 404
+    
     # Health check endpoint for database connectivity
     @app.route('/health')
     def health():
@@ -105,27 +126,6 @@ def create_app():
             logger.error(f"Health check failed: {str(e)}")
             return {'status': 'error', 'database': 'disconnected', 'details': str(e)}, 500
 
-    # Serve React static files - handle nested static directory structure
-    @app.route('/static/<path:filename>')
-    def serve_static(filename):
-        """Serve static files from React build."""
-        static_dir = os.path.join(os.path.dirname(app.root_path), 'static')
-        
-        # React build puts assets in static/static/, so we need to handle this properly
-        # First try the nested static directory (where CSS/JS files are)
-        nested_static_path = os.path.join(static_dir, 'static', filename)
-        if os.path.exists(nested_static_path):
-            return send_from_directory(os.path.join(static_dir, 'static'), filename)
-        
-        # Fallback to direct static directory (for manifest.json, favicon.ico, etc.)
-        direct_static_path = os.path.join(static_dir, filename)
-        if os.path.exists(direct_static_path):
-            return send_from_directory(static_dir, filename)
-        
-        # If file not found, return 404
-        logger.warning(f"Static file not found: {filename}")
-        return {'error': 'Static file not found'}, 404
-    
     # Serve React app for all non-API routes
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
