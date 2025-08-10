@@ -6,7 +6,18 @@ load_dotenv()
 
 class Config:
     # Database
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
+    @staticmethod
+    def get_database_uri():
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
+            # Ensure SSL is required for production (Neon.tech requirement)
+            if 'sslmode' not in db_url:
+                db_url += '?sslmode=require'
+            return db_url
+        # Fallback for local development
+        return "sqlite:///app.db"
+    
+    SQLALCHEMY_DATABASE_URI = get_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Application

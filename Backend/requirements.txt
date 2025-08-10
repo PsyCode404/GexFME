@@ -3,6 +3,7 @@ Flask-SQLAlchemy
 Flask-Migrate
 Flask-RESTx
 Flask-Swagger-UI
+Flask-JWT-Extended
 psycopg2-binary
 pycryptodome
 python-dotenv
@@ -10,3 +11,6 @@ openpyxl
 ezdxf
 flask-cors
 shapely
+gunicorn
+boto3
+botocore

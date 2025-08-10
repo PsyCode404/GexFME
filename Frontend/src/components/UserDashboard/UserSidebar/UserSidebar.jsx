@@ -61,7 +61,7 @@ const UserSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
 
   const menuItems = [
     { icon: faFileImport, label: "Importation Fichiers", path: "/user-dashboard/importation-fichiers" }, // Icône mise à jour
-    { icon: faFolder, label: "Calcul TA", path: "/user-dashboard/calcul-ta" },
+    { icon: faFolder, label: "Calcul TA/SDP", path: "/user-dashboard/calcul-ta" },
     { icon: faChartBar, label: "Ressources", path: "/user-dashboard/ressources" },
     { icon: faCog, label: "Paramètre de compte", path: "/user-dashboard/parametre_compte" },
   ];

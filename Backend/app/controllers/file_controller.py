@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, send_from_directory, send_file
 from flask_cors import cross_origin
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app.services.file_service import extract_file_data
+from app.storage import storage_service
 import logging
 import os
 from app.models.user import User
@@ -10,14 +11,15 @@ import shutil
 import json
 from werkzeug.datastructures import FileStorage
 import io
+import tempfile
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 file_blueprint = Blueprint("file", __name__)
 
-def get_user_folder_path():
-    """Récupère le chemin du dossier utilisateur basé sur l'email."""
+def get_user_email_local():
+    """Récupère la partie locale de l'email utilisateur pour les clés S3."""
     user_id = get_jwt_identity()
     claims = get_jwt()
     email = claims.get('email')
@@ -28,46 +30,84 @@ def get_user_folder_path():
             return None
         email = user.email
 
-    folder_name = email.split('@')[0].replace('.', '_')
-    base_resource_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'Ressources'))
-    return os.path.join(base_resource_path, folder_name)
+    return email.split('@')[0]
 
-def get_folder_structure(base_path, relative_path=""):
-    """Récupère récursivement la structure des dossiers et fichiers."""
+def get_user_storage_prefix():
+    """Récupère le préfixe de stockage S3 pour l'utilisateur."""
+    email_local = get_user_email_local()
+    if not email_local:
+        return None
+    return storage_service.ensure_user_prefix(email_local)
+
+def get_folder_structure_from_s3(user_prefix, relative_path=""):
+    """Récupère récursivement la structure des dossiers et fichiers depuis S3."""
     folder_structure = {"folders": [], "files": []}
     
     try:
-        full_path = os.path.join(base_path, relative_path)
-        if not os.path.exists(full_path):
-            logger.debug(f"Folder does not exist: {full_path}")
-            return folder_structure
-
-        for item in os.listdir(full_path):
-            item_path = os.path.join(full_path, item)
-            rel_item_path = os.path.join(relative_path, item) if relative_path else item
-
-            if os.path.isdir(item_path):
-                folder_info = {
-                    "name": item,
-                    "path": rel_item_path,
-                    "last_modified": datetime.fromtimestamp(os.path.getmtime(item_path)).isoformat(),
-                    "size": sum(os.path.getsize(os.path.join(item_path, f)) for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))),
-                    "sub_structure": get_folder_structure(base_path, rel_item_path)
-                }
-                folder_structure["folders"].append(folder_info)
-            elif os.path.isfile(item_path) and item.lower().endswith('.dxf'):
+        # Construct the full prefix
+        search_prefix = user_prefix
+        if relative_path:
+            search_prefix = f"{user_prefix}{relative_path}/"
+        
+        # List all objects with the prefix
+        all_files = storage_service.list_files(search_prefix)
+        
+        # Process files to build folder structure
+        folders_set = set()
+        files_list = []
+        
+        for file_key in all_files:
+            # Remove the user prefix to get relative path
+            relative_file_path = file_key[len(user_prefix):]
+            
+            # Skip if this is not in the current directory level
+            if relative_path and not relative_file_path.startswith(f"{relative_path}/"):
+                continue
+            
+            # Remove the current relative path prefix
+            if relative_path:
+                remaining_path = relative_file_path[len(f"{relative_path}/"):]
+            else:
+                remaining_path = relative_file_path
+            
+            # Skip empty paths
+            if not remaining_path:
+                continue
+            
+            # Check if this is a direct file or in a subfolder
+            path_parts = remaining_path.split('/')
+            
+            if len(path_parts) == 1:
+                # Direct file
                 file_info = {
-                    "name": item,
-                    "path": rel_item_path,
-                    "size": os.path.getsize(item_path),
-                    "last_modified": datetime.fromtimestamp(os.path.getmtime(item_path)).isoformat()
+                    "name": path_parts[0],
+                    "path": relative_file_path,
+                    "type": "file",
+                    "size": 0  # S3 doesn't provide size in list operation
                 }
-                folder_structure["files"].append(file_info)
-
-        return folder_structure
+                files_list.append(file_info)
+            else:
+                # File in subfolder - add folder to set
+                folder_name = path_parts[0]
+                folders_set.add(folder_name)
+        
+        # Convert folders set to list with proper structure
+        for folder_name in sorted(folders_set):
+            folder_path = f"{relative_path}/{folder_name}" if relative_path else folder_name
+            folder_info = {
+                "name": folder_name,
+                "path": folder_path,
+                "type": "folder",
+                "children": get_folder_structure_from_s3(user_prefix, folder_path)
+            }
+            folder_structure["folders"].append(folder_info)
+        
+        folder_structure["files"] = files_list
+        
     except Exception as e:
-        logger.error(f"Erreur lors de la récupération de la structure : {str(e)}", exc_info=True)
-        return folder_structure
+        logger.error(f"Error getting folder structure from S3: {str(e)}")
+    
+    return folder_structure
 
 @file_blueprint.route("/api/upload", methods=["POST"])
 @cross_origin()
@@ -87,16 +127,21 @@ def upload_file():
         logger.error(f"Format non supporté : {file.filename}")
         return jsonify({"error": "Seuls les fichiers .dxf sont acceptés"}), 400
 
-    user_folder_path = get_user_folder_path()
-    if not user_folder_path or not os.path.exists(user_folder_path):
-        logger.error("Dossier utilisateur non trouvé ou inaccessible")
-        return jsonify({"error": "Dossier utilisateur non trouvé"}), 400
+    user_prefix = get_user_storage_prefix()
+    if not user_prefix:
+        logger.error("Impossible de déterminer le préfixe utilisateur")
+        return jsonify({"error": "Erreur d'authentification utilisateur"}), 400
 
-    file_path = os.path.join(user_folder_path, file.filename)
-    file.save(file_path)
-    logger.debug(f"Fichier sauvegardé dans : {file_path}")
-
-    return jsonify({"message": "Fichier .dxf reçu et sauvegardé", "filename": file.filename, "path": file_path}), 200
+    # Upload file to S3
+    s3_key = f"{user_prefix}{file.filename}"
+    success = storage_service.upload_file_obj(file, s3_key)
+    
+    if not success:
+        logger.error(f"Échec de l'upload vers S3: {s3_key}")
+        return jsonify({"error": "Erreur lors de la sauvegarde du fichier"}), 500
+    
+    logger.debug(f"Fichier sauvegardé dans S3: {s3_key}")
+    return jsonify({"message": "Fichier .dxf reçu et sauvegardé", "filename": file.filename, "s3_key": s3_key}), 200
 
 @file_blueprint.route("/api/extract-data", methods=["POST"])
 @cross_origin()
@@ -137,28 +182,29 @@ def transfer_files():
         file2 = request.files['file2']
         filename1 = request.form.get('filename1')
         filename2 = request.form.get('filename2')
-        custom_folder_name = request.form.get('customFolderName')  # Récupérer le nom personnalisé
+        custom_folder_name = request.form.get('customFolderName')
 
         if not filename1 or not filename2 or not custom_folder_name:
             logger.error("Noms de fichiers ou nom de dossier personnalisé manquants")
             return jsonify({"error": "Noms de fichiers et nom de dossier personnalisé requis"}), 400
 
-        user_folder_path = get_user_folder_path()
-        if not user_folder_path or not os.path.exists(user_folder_path):
-            logger.error("Dossier utilisateur non trouvé ou inaccessible")
-            return jsonify({"error": "Dossier utilisateur non trouvé"}), 400
+        user_prefix = get_user_storage_prefix()
+        if not user_prefix:
+            logger.error("Impossible de déterminer le préfixe utilisateur")
+            return jsonify({"error": "Erreur d'authentification utilisateur"}), 400
 
-        transfer_folder = os.path.join(user_folder_path, custom_folder_name)  # Utiliser le nom personnalisé
-        os.makedirs(transfer_folder, exist_ok=True)
-        logger.debug(f"Dossier de transfert créé : {transfer_folder}")
-
-        file1_path = os.path.join(transfer_folder, filename1)
-        file2_path = os.path.join(transfer_folder, filename2)
+        # Upload files to S3 in custom folder
+        s3_key1 = f"{user_prefix}{custom_folder_name}/{filename1}"
+        s3_key2 = f"{user_prefix}{custom_folder_name}/{filename2}"
         
-        file1.save(file1_path)
-        file2.save(file2_path)
-        logger.debug(f"Fichiers sauvegardés : {file1_path}, {file2_path}")
-
+        success1 = storage_service.upload_file_obj(file1, s3_key1)
+        success2 = storage_service.upload_file_obj(file2, s3_key2)
+        
+        if not success1 or not success2:
+            logger.error(f"Échec de l'upload vers S3: {s3_key1}, {s3_key2}")
+            return jsonify({"error": "Erreur lors de la sauvegarde des fichiers"}), 500
+        
+        logger.debug(f"Fichiers sauvegardés dans S3: {s3_key1}, {s3_key2}")
         return jsonify({"message": f"Fichiers transférés avec succès dans {custom_folder_name}"}), 200
 
     except Exception as e:
@@ -170,12 +216,12 @@ def transfer_files():
 @jwt_required()
 def get_user_folder_files():
     try:
-        user_folder_path = get_user_folder_path()
-        if not user_folder_path or not os.path.exists(user_folder_path):
-            logger.error("Dossier utilisateur non trouvé ou inaccessible")
-            return jsonify({"error": "Dossier utilisateur non trouvé"}), 400
+        user_prefix = get_user_storage_prefix()
+        if not user_prefix:
+            logger.error("Impossible de déterminer le préfixe utilisateur")
+            return jsonify({"error": "Erreur d'authentification utilisateur"}), 400
 
-        folder_structure = get_folder_structure(user_folder_path)
+        folder_structure = get_folder_structure_from_s3(user_prefix)
         logger.debug(f"Folder structure returned: {json.dumps(folder_structure, indent=2)}")
         return jsonify(folder_structure), 200
 

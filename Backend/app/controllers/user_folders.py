@@ -3,6 +3,7 @@ import logging
 from flask import jsonify, current_app, request, Blueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app.models.user import User
+from app.storage import storage_service
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -66,23 +67,21 @@ def check_user_folder():
     
     logger.info(f"Email de l'utilisateur: {email}")
     
-    # Vérifier si le dossier Ressources existe, sinon le créer
-    resource_dir = os.path.join(current_app.root_path, 'Ressources')
-    if not os.path.exists(resource_dir):
-        logger.info(f"Création du dossier Ressources: {resource_dir}")
-        os.makedirs(resource_dir)
+    # Get user storage prefix for S3
+    email_local = email.split('@')[0]
+    user_prefix = storage_service.ensure_user_prefix(email_local)
     
-    # Créer le nom du dossier utilisateur basé sur l'email
-    folder_name = email.split('@')[0]
-    resource_path = os.path.join(resource_dir, folder_name)
+    # Check if user has any files in S3 (indicates folder exists)
+    user_files = storage_service.list_files(user_prefix)
+    folder_exists = len(user_files) > 0
     
-    logger.info(f"Vérification du dossier: {resource_path}")
-    folder_exists = os.path.exists(resource_path)
+    logger.info(f"Vérification du préfixe S3: {user_prefix}, fichiers trouvés: {len(user_files)}")
     
     return jsonify({
         'folderExists': folder_exists, 
-        'folderName': folder_name,
-        'message': 'Dossier vérifié avec succès'
+        'folderName': email_local,
+        'message': 'Dossier vérifié avec succès',
+        'storagePrefix': user_prefix
     }), 200
 
 # Route POST pour créer le dossier utilisateur
@@ -100,34 +99,34 @@ def create_user_folder():
     
     logger.info(f"Email de l'utilisateur: {email}")
     
-    # Vérifier si le dossier Ressources existe, sinon le créer
-    resource_dir = os.path.join(current_app.root_path, 'Ressources')
-    if not os.path.exists(resource_dir):
-        logger.info(f"Création du dossier Ressources: {resource_dir}")
-        os.makedirs(resource_dir)
+    # Get user storage prefix for S3
+    email_local = email.split('@')[0]
+    user_prefix = storage_service.ensure_user_prefix(email_local)
     
-    # Créer le nom du dossier utilisateur basé sur l'email
-    folder_name = email.split('@')[0]
-    resource_path = os.path.join(resource_dir, folder_name)
+    # Check if user already has files in S3
+    user_files = storage_service.list_files(user_prefix)
+    folder_exists = len(user_files) > 0
     
-    # Vérifier si le dossier existe déjà
-    if os.path.exists(resource_path):
-        logger.info(f"Le dossier existe déjà: {resource_path}")
+    if folder_exists:
+        logger.info(f"Le dossier S3 existe déjà: {user_prefix}")
         return jsonify({
             'message': 'Le dossier existe déjà', 
-            'folderName': folder_name,
-            'folderExists': True
+            'folderName': email_local,
+            'folderExists': True,
+            'storagePrefix': user_prefix
         }), 200
     
-    # Créer le dossier
+    # For S3, we don't need to "create" folders explicitly
+    # They are created when the first file is uploaded
+    # So we just return success with the prefix
     try:
-        os.makedirs(resource_path)
-        logger.info(f"Dossier créé avec succès: {resource_path}")
+        logger.info(f"Préfixe S3 préparé: {user_prefix}")
         return jsonify({
-            'message': 'Dossier créé avec succès', 
-            'folderName': folder_name,
-            'folderExists': True
+            'message': 'Dossier S3 préparé avec succès', 
+            'folderName': email_local,
+            'folderExists': True,
+            'storagePrefix': user_prefix
         }), 201
     except Exception as e:
-        logger.error(f"Erreur lors de la création du dossier: {str(e)}")
-        return jsonify({'error': f'Erreur lors de la création du dossier: {str(e)}'}), 500
+        logger.error(f"Erreur lors de la préparation du dossier S3: {str(e)}")
+        return jsonify({'error': f'Erreur lors de la préparation du dossier: {str(e)}'}), 500

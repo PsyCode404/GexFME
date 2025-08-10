@@ -1,5 +1,5 @@
 # app/__init__.py
-from flask import Flask, request
+from flask import Flask, request, send_from_directory, render_template_string
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_restx import Api
@@ -22,43 +22,26 @@ def create_app():
     app.config.from_object(Config)
     logger.info("Flask app created with config loaded")
 
-    # Solution CORS simplifiée pour éviter les doublons d'en-têtes
-    logger.info("Configuring simplified CORS solution")
+    # Configure CORS with environment-based origins
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    logger.info(f"Configuring CORS for frontend URL: {frontend_url}")
     
-    # Gérer les requêtes OPTIONS avant qu'elles n'atteignent les routes
-    @app.before_request
-    def handle_preflight():
-        if request.method == 'OPTIONS':
-            logger.info(f"Handling OPTIONS preflight request to {request.path}")
-            response = app.make_default_options_response()
-            response.headers.set('Access-Control-Allow-Origin', 'http://localhost:3000')
-            response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-            response.headers.set('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS')
-            response.headers.set('Access-Control-Allow-Credentials', 'true')
-            response.headers.set('Access-Control-Max-Age', '3600')
-            return response
+    # Use Flask-CORS for proper CORS handling
+    CORS(app, 
+         origins=[frontend_url],
+         allow_headers=['Content-Type', 'Authorization'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+         supports_credentials=True)
     
-    # Ajouter les en-têtes CORS à toutes les réponses non-OPTIONS
-    @app.after_request
-    def add_cors_headers(response):
-        if not request.method == 'OPTIONS':  # Ne pas ajouter d'en-têtes aux réponses OPTIONS qui ont déjà été traitées
-            logger.info(f"Adding CORS headers to response for {request.method} {request.path}")
-            # Utiliser set() au lieu de add() pour éviter les doublons
-            response.headers.set('Access-Control-Allow-Origin', 'http://localhost:3000')
-            response.headers.set('Access-Control-Allow-Credentials', 'true')
-        return response
-        
-    logger.info("Simplified CORS solution configured")
+    logger.info("CORS configured with Flask-CORS")
 
-    # Configuration JWT
-    app.config["JWT_SECRET_KEY"] = "your-secret-key-change-it"  # Change this en production !
-    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 3600  # 1 heure
-    logger.info("JWT configured")
+    # JWT configuration is handled in Config class
+    logger.info("JWT configured from Config class")
 
     # Initialisation des extensions
     db.init_app(app)
     jwt.init_app(app)
-    Migrate(app, db)
+    migrate = Migrate(app, db)
     logger.info("Extensions (DB, JWT, Migrate) initialized")
 
     # Initialisation de l'API avec Swagger
@@ -89,5 +72,55 @@ def create_app():
     # from app.controllers.user_folder_controller import ns as user_folder_ns
     # api.add_namespace(user_folder_ns, path="/api/user-folder")
     logger.info("API namespaces registered")
+
+    # Health check endpoint for database connectivity
+    @app.route('/health')
+    def health():
+        try:
+            # Test database connection
+            db.session.execute(db.text('SELECT 1'))
+            db.session.commit()
+            return {'status': 'ok', 'database': 'connected'}, 200
+        except Exception as e:
+            logger.error(f"Health check failed: {str(e)}")
+            return {'status': 'error', 'database': 'disconnected', 'details': str(e)}, 500
+
+    # Serve React static files
+    @app.route('/static/<path:filename>')
+    def serve_static(filename):
+        """Serve static files from React build."""
+        static_dir = os.path.join(app.root_path, 'static')
+        return send_from_directory(static_dir, filename)
+    
+    # Serve React app for all non-API routes
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
+    def serve_react_app(path):
+        """Serve React app for frontend routes."""
+        # Don't serve React for API routes
+        if path.startswith('api/'):
+            return {'error': 'API endpoint not found'}, 404
+        
+        # Serve index.html for all frontend routes
+        static_dir = os.path.join(app.root_path, 'static')
+        index_path = os.path.join(static_dir, 'index.html')
+        
+        if os.path.exists(index_path):
+            return send_from_directory(static_dir, 'index.html')
+        else:
+            # Fallback if React build not found
+            return render_template_string('''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>GexFME - Build Not Found</title>
+            </head>
+            <body>
+                <h1>GexFME Backend</h1>
+                <p>React frontend build not found. Please build the frontend first.</p>
+                <p><a href="/health">Health Check</a></p>
+            </body>
+            </html>
+            ''')
 
     return app

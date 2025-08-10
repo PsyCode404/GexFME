@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: gexfme-app
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt  # Closest to Europe for Gexpertise corporate
+    branch: master
+    buildCommand: ""  # Docker handles the build
+    startCommand: ""  # Docker handles the start command
+    healthCheckPath: /health
+    envVars:
+      # Database Configuration (Neon.tech) - READY TO USE
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_fejUnu9I8qBl@ep-gentle-waterfall-a2no54oi-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      
+      # Security Keys - Render will auto-generate secure values
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      
+      # Frontend URL - Update after deployment
+      - key: FRONTEND_URL
+        value: https://gexfme-app.onrender.com
+      
+      # S3 Storage Configuration - Backblaze B2 (CONFIGURED)
+      - key: S3_BUCKET
+        value: gexfme-production
+      - key: S3_ENDPOINT_URL
+        value: https://s3.eu-central-003.backblazeb2.com
+      - key: S3_ACCESS_KEY_ID
+        value: c6ec05fe289d
+      - key: S3_SECRET_ACCESS_KEY
+        value: 0034bcd0aa3dbd2d03da39e7d7dc94a131d5d1667e
+      - key: S3_REGION
+        value: eu-central-003
+      
+      # Flask Environment
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    
+    # Auto-deploy on git push
+    autoDeploy: true
+    
+    # Custom domains for Gexpertise corporate (optional)
+    # domains:
+    #   - gexfme.gexpertise.com

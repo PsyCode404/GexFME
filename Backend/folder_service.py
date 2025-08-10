@@ -13,12 +13,84 @@ from openpyxl.comments import Comment
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 from flask import request, jsonify, send_file
+from flask_jwt_extended import get_jwt_identity, get_jwt
+from app.storage import storage_service
+from app.models.user import User
 import io
 import math
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# S3 Storage Helper Functions
+def get_user_email_from_request():
+    """Get user email from JWT token or request data."""
+    try:
+        # Try to get from JWT first
+        user_id = get_jwt_identity()
+        if user_id:
+            claims = get_jwt()
+            email = claims.get('email')
+            if email:
+                return email
+            
+            # Fallback to database
+            user = User.query.get(user_id)
+            if user:
+                return user.email
+        
+        # Fallback to request data
+        data = request.get_json() or {}
+        return data.get('email')
+    except Exception as e:
+        logger.error(f"Error getting user email: {str(e)}")
+        return None
+
+def get_user_storage_prefix_from_email(email):
+    """Get S3 storage prefix for user based on email."""
+    if not email:
+        return None
+    email_local = email.split('@')[0]
+    return storage_service.ensure_user_prefix(email_local)
+
+def save_file_to_s3(file_content, s3_key, is_binary=False):
+    """Save file content to S3 storage."""
+    try:
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, mode='wb' if is_binary else 'w', 
+                                       encoding=None if is_binary else 'utf-8') as temp_file:
+            if is_binary:
+                temp_file.write(file_content)
+            else:
+                temp_file.write(file_content)
+            temp_path = temp_file.name
+        
+        # Upload to S3
+        success = storage_service.upload_file(temp_path, s3_key)
+        
+        # Clean up temp file
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+        
+        return success
+    except Exception as e:
+        logger.error(f"Error saving file to S3: {str(e)}")
+        return False
+
+def get_file_from_s3(s3_key):
+    """Download file from S3 and return local temp path."""
+    try:
+        temp_path = storage_service.get_temp_file_path(s3_key)
+        success = storage_service.download_file(s3_key, temp_path)
+        if success:
+            return temp_path
+        return None
+    except Exception as e:
+        logger.error(f"Error getting file from S3: {str(e)}")
+        return None
 
 def create_folder():
     """Crée un dossier utilisateur basé sur l'email fourni dans la requête"""
@@ -2465,6 +2537,18 @@ def generate_visa_content(surfaces, floor_name):
     content.append("")
     return "\n".join(content)
 
+def zero_small_heights(value):
+    """Set height values less than 0.5 to 0 as they are negligible
+    
+    According to business rules, any height below 0.5 meters should be
+    treated as zero throughout all calculations and Excel output.
+    """
+    try:
+        value = float(value)
+        return 0 if value < 0.5 else value
+    except (ValueError, TypeError):
+        return 0
+
 def create_excel_document(excel_path, surfaces, floor_name):
     """Crée un document Excel avec les données de surface"""
     wb = openpyxl.Workbook()
@@ -3341,6 +3425,10 @@ def create_excel_document(excel_path, surfaces, floor_name):
                 contained_in_zone = False
                 for main_polyline in main_projet_polylines:
                     if get_destination_name(main_polyline) == destination and is_contained(polyline, main_polyline):
+                        # Apply zero_small_heights at the source for entire contained polylines
+                        if h180_area < 0.5:
+                            h180_area = 0
+                        
                         surfaces_h_moins_180 += h180_area
                         intersection_details[h180_id]['intersections'][destination] = h180_area
                         logger.info(f"Excel: Surface H-180 {special_layer} entièrement contenue dans la zone {destination}, surface déduite: {h180_area:.2f} m²")
@@ -3364,6 +3452,10 @@ def create_excel_document(excel_path, surfaces, floor_name):
                                     adjusted_area = max(0, h180_area - already_counted)
                                     logger.warning(f"Ajustement de l'intersection H-180 pour éviter le double comptage: {intersection_area:.2f} → {adjusted_area:.2f} m²")
                                     intersection_area = adjusted_area
+                                
+                                # Apply zero_small_heights at the intersection calculation level
+                                if intersection_area < 0.5:
+                                    intersection_area = 0
                                 
                                 surfaces_h_moins_180 += intersection_area
                                 intersection_details[h180_id]['intersections'][destination] = intersection_area
@@ -3408,13 +3500,46 @@ def create_excel_document(excel_path, surfaces, floor_name):
         total_ta = max(0, total_ta)
         
         # Stocker les données pour cette destination
+        # Final aggressive check before storing in dictionary
+        if surfaces_h_moins_180 < 0.5:
+            logger.info(f"DEBUG INITIAL: Zeroing height value at dictionary creation - Destination: {destination}, Value: {surfaces_h_moins_180}")
+            surfaces_h_moins_180 = 0
+            # Recalculate total TA with zeroed height
+            total_ta = max(0, planchers_avant_deductions - vides)
+        
         ta_data[destination] = {
             'planchers_avant_deductions': planchers_avant_deductions,
             'vides': vides,
             'surfaces_h_moins_180': surfaces_h_moins_180,
             'total_ta': total_ta
         }
+        
+        # Verification log to confirm stored values
+        logger.info(f"DEBUG VERIFY: Dictionary values for {destination} - Height: {ta_data[destination]['surfaces_h_moins_180']}")
+
     
+    # Pre-process all data to ensure no height values less than 0.5 remain
+    def enforce_height_rule(data_dict):
+        """Ensure all height values less than 0.5 in the dictionary are set to 0"""
+        if not data_dict:
+            return
+            
+        for dest in data_dict.keys():
+            if 'surfaces_h_moins_180' in data_dict[dest]:
+                height = data_dict[dest]['surfaces_h_moins_180']
+                if height < 0.5:
+                    # Log this for debugging
+                    logger.info(f"FIXING: Small height value found for {dest}: {height}, setting to 0")
+                    data_dict[dest]['surfaces_h_moins_180'] = 0
+                    # Recalculate total_ta
+                    planchers = data_dict[dest].get('planchers_avant_deductions', 0)
+                    vides = data_dict[dest].get('vides', 0)
+                    data_dict[dest]['total_ta'] = max(0, planchers - vides)
+    
+    # Apply the rule to all data dictionaries
+    enforce_height_rule(ta_data)
+    enforce_height_rule(ta_existant_data)
+                
     # Ajouter les données T.A. à la feuille TA
     ta_row = 2  # Commencer à la ligne 2
     for destination in sorted_destinations:
@@ -3464,7 +3589,32 @@ def create_excel_document(excel_path, surfaces, floor_name):
         
         # Colonne E: Surfaces dont h < 1.80m
         surfaces_h_moins_180 = destination_ta_data.get('surfaces_h_moins_180', 0)
-        ws_ta[f'E{ta_row}'] = round(surfaces_h_moins_180, 4) if surfaces_h_moins_180 > 0 else 0
+        
+        # DEBUG: Log original value before processing
+        logger.info(f"DEBUG: Before processing - Destination: {destination}, Height value: {surfaces_h_moins_180}")
+        
+        # FORCE all small height values to zero directly (most aggressive approach)
+        if surfaces_h_moins_180 < 0.5:
+            logger.info(f"DEBUG: ZEROING small height - Destination: {destination}, Original value: {surfaces_h_moins_180}")
+            surfaces_h_moins_180 = 0
+            destination_ta_data['surfaces_h_moins_180'] = 0
+            # Also update TA data dictionary to ensure consistency everywhere
+            if destination in ta_data:
+                ta_data[destination]['surfaces_h_moins_180'] = 0
+                # Recalculate total_ta
+                planchers = ta_data[destination].get('planchers_avant_deductions', 0)
+                vides = ta_data[destination].get('vides', 0)
+                ta_data[destination]['total_ta'] = max(0, planchers - vides)
+        
+        # Write empty string if zero, otherwise round to 4 decimal places
+        if surfaces_h_moins_180 == 0:
+            ws_ta[f'E{ta_row}'] = ""
+        else:
+            ws_ta[f'E{ta_row}'] = round(surfaces_h_moins_180, 4)
+            # Extra verification - if value somehow slipped through, force it to blank
+            if round(surfaces_h_moins_180, 4) < 0.5:
+                logger.info(f"DEBUG: EMERGENCY FIX - Value slipped through: {round(surfaces_h_moins_180, 4)}")
+                ws_ta[f'E{ta_row}'] = ""
         cell = ws_ta[f'E{ta_row}']
         cell.font = data_font
         cell.alignment = data_alignment
@@ -3568,7 +3718,10 @@ def create_excel_document(excel_path, surfaces, floor_name):
         destination_ta_data = ta_data.get(destination, {})
         total_ta_avant_deduction += destination_ta_data.get('planchers_avant_deductions', 0)
         total_vides += destination_ta_data.get('vides', 0)
-        total_h_moins_180 += destination_ta_data.get('surfaces_h_moins_180', 0)
+        # Apply zero_small_heights to individual height values before adding to total
+        h_value = destination_ta_data.get('surfaces_h_moins_180', 0)
+        h_value = zero_small_heights(h_value)
+        total_h_moins_180 += h_value
         total_ta_apres_deduction += destination_ta_data.get('total_ta', 0)
     
     # Calculer le pourcentage total de vides
@@ -3580,7 +3733,24 @@ def create_excel_document(excel_path, surfaces, floor_name):
     ws_ta_summary['A2'] = floor_name
     ws_ta_summary['B2'] = round(total_ta_avant_deduction, 4) if total_ta_avant_deduction > 0 else 0
     ws_ta_summary['C2'] = round(total_vides, 4) if total_vides > 0 else 0
-    ws_ta_summary['D2'] = round(total_h_moins_180, 4) if total_h_moins_180 > 0 else 0
+    
+    # Emergency debug and fix for the summary sheet
+    logger.info(f"DEBUG SUMMARY: Before processing - Total height value: {total_h_moins_180}")
+    
+    # FORCE all small height values to zero directly (most aggressive approach)
+    if total_h_moins_180 < 0.5:
+        logger.info(f"DEBUG SUMMARY: ZEROING small height - Original value: {total_h_moins_180}")
+        total_h_moins_180 = 0
+    
+    # Use empty string for zero height values
+    if total_h_moins_180 == 0:
+        ws_ta_summary['D2'] = ""
+    else:
+        ws_ta_summary['D2'] = round(total_h_moins_180, 4)
+        # Last chance verification - if somehow a small value got through
+        if round(total_h_moins_180, 4) < 0.5:
+            logger.info(f"DEBUG SUMMARY: EMERGENCY FIX - Value slipped through: {round(total_h_moins_180, 4)}")
+            ws_ta_summary['D2'] = ""
     ws_ta_summary['E2'] = round(total_ta_apres_deduction, 4) if total_ta_apres_deduction > 0 else 0
     ws_ta_summary['F2'] = f"{total_vide_percentage:.2f}%"
     ws_ta_summary['G2'] = round(ta_projet_total, 4) if ta_projet_total > 0 else 0

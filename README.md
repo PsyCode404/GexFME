@@ -210,11 +210,43 @@ Notes:
 - Intersection computations rely on Shapely; small geometry artifacts are mitigated via validity checks and small buffers.
 
 
+## Deployment
+
+### Production Deployment (Render + S3)
+The application is configured for single-service deployment on Render with S3-compatible storage:
+
+- **Multi-stage Docker build**: React frontend + Flask backend in one container
+- **Database**: Neon.tech PostgreSQL with SSL
+- **Storage**: S3-compatible (Cloudflare R2 or AWS S3) for file operations
+- **Auto-deployment**: GitHub integration via `render.yaml`
+
+See `DEPLOYMENT.md` for complete deployment instructions.
+
+### Quick Deploy to Render
+1. Set up S3 bucket (Cloudflare R2 recommended)
+2. Push to GitHub and connect to Render
+3. Configure environment variables in Render dashboard
+4. Deploy using the included `Dockerfile` and `render.yaml`
+
+### Environment Variables (Production)
+```bash
+DATABASE_URL=postgresql://...  # Neon.tech connection string
+SECRET_KEY=<secure-random-key>
+JWT_SECRET_KEY=<secure-random-key>
+FRONTEND_URL=https://your-app.onrender.com
+S3_BUCKET=your-bucket-name
+S3_ENDPOINT_URL=https://your-account.r2.cloudflarestorage.com
+S3_ACCESS_KEY_ID=<your-access-key>
+S3_SECRET_ACCESS_KEY=<your-secret-key>
+S3_REGION=auto
+```
+
 ## Development Notes
 - Ensure `DATABASE_URL`, `SECRET_KEY`, and `JWT_SECRET_KEY` are set before starting the backend.
-- CORS origin is fixed to `http://localhost:3000` by default; adjust in `Backend/app/__init__.py` if needed.
+- CORS is configured via `FRONTEND_URL` environment variable (defaults to `http://localhost:3000`).
 - Passwords are AES‑encrypted at rest (PBKDF2‑derived key from `SECRET_KEY`). Rotate keys with care.
 - DXF parsing and geometry rely on `ezdxf` and `shapely`; install system libs if your OS requires them.
+- File storage uses S3-compatible abstraction (`Backend/app/storage.py`) for both local development and production.
 
 
 ## License
