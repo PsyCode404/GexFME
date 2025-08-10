@@ -48,7 +48,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY Backend/ ./
 
 # Copy React build from frontend stage
-COPY --from=frontend-builder /app/frontend/build ./app/static
+COPY --from=frontend-builder /app/frontend/build ./static
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app && \

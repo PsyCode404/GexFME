@@ -90,7 +90,7 @@ def create_app():
     @app.route('/static/<path:filename>')
     def serve_static(filename):
         """Serve static files from React build."""
-        static_dir = os.path.join(os.path.dirname(app.root_path), 'app', 'static')
+        static_dir = os.path.join(os.path.dirname(app.root_path), 'static')
         return send_from_directory(static_dir, filename)
     
     # Serve React app for all non-API routes
@@ -103,7 +103,7 @@ def create_app():
             return {'error': 'API endpoint not found'}, 404
         
         # Serve index.html for all frontend routes
-        static_dir = os.path.join(os.path.dirname(app.root_path), 'app', 'static')
+        static_dir = os.path.join(os.path.dirname(app.root_path), 'static')
         index_path = os.path.join(static_dir, 'index.html')
         
         if os.path.exists(index_path):
