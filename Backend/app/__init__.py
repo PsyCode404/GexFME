@@ -99,6 +99,25 @@ def create_app():
         logger.warning(f"Static file not found: {filename}")
         return {'error': 'Static file not found'}, 404
     
+    # Debug route to test static file serving
+    @app.route('/debug/static/<path:filename>')
+    def debug_static(filename):
+        """Debug static file serving."""
+        static_dir = os.path.join(os.path.dirname(app.root_path), 'static')
+        nested_static_path = os.path.join(static_dir, 'static', filename)
+        direct_static_path = os.path.join(static_dir, filename)
+        
+        return {
+            'filename': filename,
+            'static_dir': static_dir,
+            'nested_path': nested_static_path,
+            'direct_path': direct_static_path,
+            'nested_exists': os.path.exists(nested_static_path),
+            'direct_exists': os.path.exists(direct_static_path),
+            'app_root_path': app.root_path,
+            'dirname_app_root': os.path.dirname(app.root_path)
+        }
+    
     # Health check endpoint for database connectivity
     @app.route('/health')
     def health():
@@ -107,19 +126,33 @@ def create_app():
             db.session.execute(db.text('SELECT 1'))
             db.session.commit()
             
-            # Debug: Check file structure
+            # Debug: Check file structure with more details
             import glob
-            static_files = glob.glob('/app/static/**/*', recursive=True)[:10]  # Limit to 10 files
+            static_files = glob.glob('/app/static/**/*', recursive=True)
+            css_files = glob.glob('/app/static/static/css/*', recursive=True)
+            js_files = glob.glob('/app/static/static/js/*', recursive=True)
             app_files = glob.glob('/app/app/**/*', recursive=True)[:10]
+            
+            # Check specific file paths
+            static_dir = os.path.join(os.path.dirname(app.root_path), 'static')
+            test_css_path = os.path.join(static_dir, 'static', 'css', 'main.4fa125d7.css')
+            test_js_path = os.path.join(static_dir, 'static', 'js', 'main.a8e0dfe4.js')
             
             return {
                 'status': 'ok', 
                 'database': 'connected',
                 'debug': {
                     'app_root_path': app.root_path,
-                    'static_files_in_app_static': static_files,
+                    'static_dir_calculated': static_dir,
+                    'all_static_files': static_files,
+                    'css_files': css_files,
+                    'js_files': js_files,
                     'files_in_app_app': app_files,
-                    'cwd': os.getcwd()
+                    'cwd': os.getcwd(),
+                    'test_css_exists': os.path.exists(test_css_path),
+                    'test_js_exists': os.path.exists(test_js_path),
+                    'test_css_path': test_css_path,
+                    'test_js_path': test_js_path
                 }
             }, 200
         except Exception as e:
