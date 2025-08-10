@@ -24,11 +24,15 @@ def create_app():
 
     # Configure CORS with environment-based origins
     frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
-    logger.info(f"Configuring CORS for frontend URL: {frontend_url}")
+    production_url = 'https://gexfme.onrender.com'
+    
+    # In production, allow both the production URL and any configured frontend URL
+    allowed_origins = [frontend_url, production_url] if frontend_url != production_url else [production_url]
+    logger.info(f"Configuring CORS for origins: {allowed_origins}")
     
     # Use Flask-CORS for proper CORS handling
     CORS(app, 
-         origins=[frontend_url],
+         origins=allowed_origins,
          allow_headers=['Content-Type', 'Authorization'],
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
          supports_credentials=True)
@@ -101,12 +105,26 @@ def create_app():
             logger.error(f"Health check failed: {str(e)}")
             return {'status': 'error', 'database': 'disconnected', 'details': str(e)}, 500
 
-    # Serve React static files
+    # Serve React static files - handle nested static directory structure
     @app.route('/static/<path:filename>')
     def serve_static(filename):
         """Serve static files from React build."""
         static_dir = os.path.join(os.path.dirname(app.root_path), 'static')
-        return send_from_directory(static_dir, filename)
+        
+        # React build puts assets in static/static/, so we need to handle this properly
+        # First try the nested static directory (where CSS/JS files are)
+        nested_static_path = os.path.join(static_dir, 'static', filename)
+        if os.path.exists(nested_static_path):
+            return send_from_directory(os.path.join(static_dir, 'static'), filename)
+        
+        # Fallback to direct static directory (for manifest.json, favicon.ico, etc.)
+        direct_static_path = os.path.join(static_dir, filename)
+        if os.path.exists(direct_static_path):
+            return send_from_directory(static_dir, filename)
+        
+        # If file not found, return 404
+        logger.warning(f"Static file not found: {filename}")
+        return {'error': 'Static file not found'}, 404
     
     # Serve React app for all non-API routes
     @app.route('/', defaults={'path': ''})
