@@ -81,7 +81,22 @@ def create_app():
             # Test database connection
             db.session.execute(db.text('SELECT 1'))
             db.session.commit()
-            return {'status': 'ok', 'database': 'connected'}, 200
+            
+            # Debug: Check file structure
+            import glob
+            static_files = glob.glob('/app/static/**/*', recursive=True)[:10]  # Limit to 10 files
+            app_files = glob.glob('/app/app/**/*', recursive=True)[:10]
+            
+            return {
+                'status': 'ok', 
+                'database': 'connected',
+                'debug': {
+                    'app_root_path': app.root_path,
+                    'static_files_in_app_static': static_files,
+                    'files_in_app_app': app_files,
+                    'cwd': os.getcwd()
+                }
+            }, 200
         except Exception as e:
             logger.error(f"Health check failed: {str(e)}")
             return {'status': 'error', 'database': 'disconnected', 'details': str(e)}, 500
