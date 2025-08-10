@@ -18,7 +18,8 @@ jwt = JWTManager()
 
 def create_app():
     """Crée et configure l'application Flask."""
-    app = Flask(__name__)
+    # Create Flask app with custom static configuration to avoid conflicts
+    app = Flask(__name__, static_folder=None, static_url_path=None)
     app.config.from_object(Config)
     logger.info("Flask app created with config loaded")
 
@@ -79,20 +80,27 @@ def create_app():
     logger.info("API namespaces registered")
 
     # Serve React static files - handle nested static directory structure
+    # Use a more specific route to avoid conflicts with Flask's built-in static handling
     @app.route('/static/<path:filename>')
     def serve_static(filename):
         """Serve static files from React build."""
+        logger.info(f"Static route called for filename: {filename}")
         static_dir = os.path.join(os.path.dirname(app.root_path), 'static')
+        logger.info(f"Static dir calculated as: {static_dir}")
         
         # React build puts assets in static/static/, so we need to handle this properly
         # First try the nested static directory (where CSS/JS files are)
         nested_static_path = os.path.join(static_dir, 'static', filename)
+        logger.info(f"Checking nested path: {nested_static_path}, exists: {os.path.exists(nested_static_path)}")
         if os.path.exists(nested_static_path):
+            logger.info(f"Serving from nested directory: {os.path.join(static_dir, 'static')}")
             return send_from_directory(os.path.join(static_dir, 'static'), filename)
         
         # Fallback to direct static directory (for manifest.json, favicon.ico, etc.)
         direct_static_path = os.path.join(static_dir, filename)
+        logger.info(f"Checking direct path: {direct_static_path}, exists: {os.path.exists(direct_static_path)}")
         if os.path.exists(direct_static_path):
+            logger.info(f"Serving from direct directory: {static_dir}")
             return send_from_directory(static_dir, filename)
         
         # If file not found, return 404
