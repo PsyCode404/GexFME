@@ -44,8 +44,9 @@ def create_app():
     migrate = Migrate(app, db, directory='migrations')
     logger.info("Extensions (DB, JWT, Migrate) initialized")
 
-    # Initialisation de l'API avec Swagger
-    api = Api(app, title="API Auth", version="1.0", description="API d'authentification")
+    # Initialisation de l'API avec Swagger - confined to /api/ path
+    api = Api(app, title="GexFME API", version="1.0", description="API d'authentification", 
+              doc='/api/', prefix='/api')
     logger.info("API initialized with Swagger")
 
     # Importation et enregistrement des Blueprints
@@ -63,9 +64,9 @@ def create_app():
     from app.controllers.auth_controller import auth_ns
     from app.controllers.folder_controller import ns as folder_ns
 
-    api.add_namespace(user_ns, path="/api/users")
-    api.add_namespace(auth_ns, path="/api/auth")
-    api.add_namespace(folder_ns, path="/api/folders")
+    api.add_namespace(user_ns, path="/users")
+    api.add_namespace(auth_ns, path="/auth")
+    api.add_namespace(folder_ns, path="/folders")
     
     # Ne pas enregistrer le namespace user_folder_ns pour éviter les conflits
     # avec le blueprint user_folder_blueprint
