@@ -1,7 +1,8 @@
 import axios from "axios";
+import { API_CONFIG } from '../config/api';
 
 // URL de l'API pour l'authentification
-const API_URL = "http://localhost:5000/api/auth/";
+const API_URL = API_CONFIG.AUTH.BASE;
 
 // Fonction pour sauvegarder le token et les infos utilisateur dans localStorage
 const saveToken = (token, user) => {

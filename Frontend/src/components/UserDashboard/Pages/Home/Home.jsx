@@ -24,7 +24,7 @@ const Home = () => {
           const userId = decodedToken.identity;
           
           // Récupérer les informations de l'utilisateur depuis l'API
-          fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/users/${userId}`)
+          fetch(`${process.env.REACT_APP_API_URL || "https://gexfme.onrender.com"}/api/users/${userId}`)
             .then(response => response.json())
             .then(data => {
               setUserName(`${data.prenom} ${data.nom}`);

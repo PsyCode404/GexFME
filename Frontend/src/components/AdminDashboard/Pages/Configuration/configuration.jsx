@@ -41,7 +41,7 @@ const Configuration = () => {
     const token = getToken();
     console.log("Token pour fetchUserData:", token);
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+      const response = await fetch(`https://gexfme.onrender.com/api/users/${userId}`, {
         headers: {
           "Authorization": `Bearer ${token}`,
         },
@@ -70,7 +70,7 @@ const Configuration = () => {
     const token = getToken();
     console.log("Token pour handleProfileUpdate:", token);
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+      const response = await fetch(`https://gexfme.onrender.com/api/users/${userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -111,7 +111,7 @@ const Configuration = () => {
       return;
     }
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${userId}/password`, {
+      const response = await fetch(`https://gexfme.onrender.com/api/users/${userId}/password`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

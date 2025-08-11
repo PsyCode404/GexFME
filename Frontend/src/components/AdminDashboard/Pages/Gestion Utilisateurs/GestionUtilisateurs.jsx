@@ -30,7 +30,7 @@ const GestionUtilisateurs = ({ sidebarOpen = false }) => {
       
       // Utiliser XMLHttpRequest pour être cohérent avec le reste de l'application
       const xhr = new XMLHttpRequest();
-      xhr.open('GET', 'http://localhost:5000/api/users/', true);
+      xhr.open('GET', 'https://gexfme.onrender.com/api/users/', true);
       xhr.setRequestHeader('Content-Type', 'application/json');
       
       // Ajouter le token d'authentification si disponible
@@ -175,7 +175,7 @@ const GestionUtilisateurs = ({ sidebarOpen = false }) => {
           email: selectedUser.email,
           role: selectedUser.locked ? 'admin' : 'user',
         };
-        await axios.put(`http://localhost:5000/api/users/${selectedUser.id}`, updatedUser, config);
+        await axios.put(`https://gexfme.onrender.com/api/users/${selectedUser.id}`, updatedUser, config);
         message.success({
           content: `Utilisateur ${selectedUser.locked ? 'déverrouillé' : 'verrouillé'} : ${selectedUser.fullName}`,
           duration: 2,
@@ -187,7 +187,7 @@ const GestionUtilisateurs = ({ sidebarOpen = false }) => {
         
         // Utiliser XMLHttpRequest au lieu d'axios pour la suppression
         const xhr = new XMLHttpRequest();
-        xhr.open('DELETE', `http://localhost:5000/api/users/${selectedUser.id}`, true);
+        xhr.open('DELETE', `https://gexfme.onrender.com/api/users/${selectedUser.id}`, true);
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         
@@ -270,7 +270,7 @@ const GestionUtilisateurs = ({ sidebarOpen = false }) => {
         email: values.email,
         role: values.role,
       };
-      await axios.put(`http://localhost:5000/api/users/${selectedUser.id}`, updatedUser);
+      await axios.put(`https://gexfme.onrender.com/api/users/${selectedUser.id}`, updatedUser);
       message.success({
         content: `Utilisateur ${selectedUser.fullName} mis à jour avec succès !`,
         duration: 2,
@@ -306,7 +306,7 @@ const GestionUtilisateurs = ({ sidebarOpen = false }) => {
         password: values.password,
         role: values.role,
       };
-      await axios.post('http://localhost:5000/api/users/', newUser);
+      await axios.post('https://gexfme.onrender.com/api/users/', newUser);
       message.success({
         content: 'Utilisateur ajouté avec succès !',
         duration: 2,

@@ -14,7 +14,7 @@ import "primeicons/primeicons.css";
 import "./parametre_compte.css";
 
 // Définir l'URL de l'API de manière constante
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_URL = process.env.REACT_APP_API_URL || "https://gexfme.onrender.com";
 
 const DashboardParametreCompte = () => {
   const [selectedKey, setSelectedKey] = useState("1");
@@ -45,7 +45,7 @@ const DashboardParametreCompte = () => {
     const token = getToken();
     console.log("Token pour fetchUserData:", token);
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+      const response = await fetch(`https://gexfme.onrender.com/api/users/${userId}`, {
         headers: {
           "Authorization": `Bearer ${token}`,
         },
