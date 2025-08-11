@@ -7,7 +7,7 @@ import { logout } from '../../../../services/authService';
 
 const { Text, Title } = Typography;
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 'https://gexfme.onrender.com';
 // Use the same API URL for folder service endpoints
 const FOLDER_SERVICE_URL = API_URL;
 axios.defaults.baseURL = API_URL;

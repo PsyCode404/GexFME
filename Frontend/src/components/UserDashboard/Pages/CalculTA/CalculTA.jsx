@@ -6,7 +6,7 @@ import CalculSurface from './CalculSurface';
 import axios from 'axios';
 
 // URL du service dédié pour les dossiers utilisateurs
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 'https://gexfme.onrender.com';
 const FOLDER_SERVICE_URL = API_URL;
 
 const { Title, Text } = Typography;

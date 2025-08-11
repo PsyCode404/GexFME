@@ -6,7 +6,7 @@ import UserFolderSection from './UserFolderSection';
 import axios from 'axios';
 
 // URL du service pour les dossiers utilisateurs (intégré dans l'API principale)
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 'https://gexfme.onrender.com';
 const FOLDER_SERVICE_URL = API_URL;
 
 const { Title, Text } = Typography;

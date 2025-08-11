@@ -8,7 +8,7 @@ import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
 
 // Define API URL for consistency
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 'https://gexfme.onrender.com';
 
 const { Text, Title } = Typography;
 

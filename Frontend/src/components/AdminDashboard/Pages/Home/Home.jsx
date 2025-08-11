@@ -30,7 +30,7 @@ const Home = () => {
           const adminId = decodedToken.identity;
           
           // Récupérer les informations de l'administrateur depuis l'API
-          fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/users/${adminId}`)
+          fetch(`${process.env.REACT_APP_API_URL || "https://gexfme.onrender.com"}/api/users/${adminId}`)
             .then(response => response.json())
             .then(data => {
               setAdminName(`${data.prenom} ${data.nom}`);
