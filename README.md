@@ -2,8 +2,7 @@
  
 Note: This application was built for the corporate Gexpertise.
 
-A full‑stack web application for authenticated management of user workspaces and engineering files (notably DXF), with extraction, transfer, and report generation workflows. The app provides role‑based dashboards (Admin/User), integrates with a PostgreSQL database, and exposes a documented REST API backed by Flask. The frontend is built with React and Ant Design/PrimeReact components.
-
+A full‑stack web application for authenticated management of user workspaces and engineering files, primarily DXF files, with automated surface calculation, extraction, transfer, and report generation workflows. The app features role-based dashboards (Admin/User), integrates with a PostgreSQL database, and exposes a documented REST API powered by Flask. The frontend is built with React using Ant Design and PrimeReact components.
 
 ## Features
 - **Authentication (JWT)**: Login, signup, and profile retrieval with JWT access tokens.
